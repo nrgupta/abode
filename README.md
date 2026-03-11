@@ -16,23 +16,21 @@ cp .env.example .env   # fill in your API keys
 python3 src/server.py   # start the web UI at http://localhost:3000
 ```
 
-## Web UI
-
-Run `python3 src/server.py` and open `http://localhost:3000`.
-
-Filters available:
-- Sources (Zillow, Redfin, Craigslist)
-- Min/max bedrooms
-- Min bathrooms
-- Min/max monthly rent
-
-## CLI (headless scrape)
+## Daily Job (scrape + sync to Google Sheets)
 
 ```bash
-python3 src/main.py
+python3 src/daily.py
 ```
 
-Scrapes all sources, prints results grouped by source, and exits.
+Scrapes Redfin and Zillow using the filters in `src/config.py`, deduplicates results, and syncs them to your configured Google Sheet.
+
+## Web UI
+
+```bash
+python3 src/server.py
+```
+
+Starts a local server at `http://localhost:3000` for searching with filters.
 
 ## Project Structure
 
@@ -42,14 +40,15 @@ src/
     zillow.py         # Zillow API
     redfin.py         # Redfin (Playwright)
     craigslist.py     # Craigslist (Playwright)
-  agents/
-    listing_agent.py  # Claude AI listing analysis
+  agent/
+    listingsTool.py   # Scraper orchestration + deduplication
   sheets/
     google_sheets.py  # Google Sheets sync
   public/
     index.html        # Web UI
   server.py           # Flask server for UI
   main.py             # CLI entry point
+  daily.py            # Daily job (scrape + sync)
   config.py           # Search filters & preferences
 ```
 
