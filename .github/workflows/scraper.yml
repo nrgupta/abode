@@ -1,4 +1,4 @@
-name: 🏠 Apartment Finder — Daily Run
+name: Apartment Finder — Daily Run
 
 on:
   schedule:
@@ -11,19 +11,21 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - uses: actions/setup-python@v5
         with:
-          node-version: "20"
-          cache: "npm"
-      - run: npm ci
-      - name: Install Chrome
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: python -m playwright install chromium --with-deps
+
       - name: Run apartment finder
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
-        run: node src/index.js
+        run: python src/main.py

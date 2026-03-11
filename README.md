@@ -10,14 +10,15 @@ Scrapes Zillow, Redfin (Lincoln Park), and Craigslist for Chicago rentals. Inclu
 ## Quick Start
 
 ```bash
-npm install
+pip3 install -r requirements.txt
+python3 -m playwright install chromium
 cp .env.example .env   # fill in your API keys
-npm run ui             # start the web UI at http://localhost:3000
+python3 src/server.py   # start the web UI at http://localhost:3000
 ```
 
 ## Web UI
 
-Run `npm run ui` and open `http://localhost:3000`.
+Run `python3 src/server.py` and open `http://localhost:3000`.
 
 Filters available:
 - Sources (Zillow, Redfin, Craigslist)
@@ -28,7 +29,7 @@ Filters available:
 ## CLI (headless scrape)
 
 ```bash
-node src/index.js
+python3 src/main.py
 ```
 
 Scrapes all sources, prints results grouped by source, and exits.
@@ -38,18 +39,18 @@ Scrapes all sources, prints results grouped by source, and exits.
 ```
 src/
   scrapers/
-    zillow.js       # Zillow API
-    redfin.js       # Redfin (Puppeteer)
-    craigslist.js   # Craigslist (Puppeteer)
+    zillow.py         # Zillow API
+    redfin.py         # Redfin (Playwright)
+    craigslist.py     # Craigslist (Playwright)
   agents/
-    listingAgent.js # Claude AI listing analysis
+    listing_agent.py  # Claude AI listing analysis
   sheets/
-    googleSheets.js # Google Sheets sync
+    google_sheets.py  # Google Sheets sync
   public/
-    index.html      # Web UI
-  server.js         # Express server for UI
-  index.js          # CLI entry point
-  config.js         # Search filters & preferences
+    index.html        # Web UI
+  server.py           # Flask server for UI
+  main.py             # CLI entry point
+  config.py           # Search filters & preferences
 ```
 
 ## Environment Variables

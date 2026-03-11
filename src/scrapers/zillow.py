@@ -1,0 +1,128 @@
+import json
+import re
+import urllib.request
+from datetime import datetime, timezone
+
+ZILLOW_API_URL = "https://www.zillow.com/async-create-search-page-state"
+
+# Chicago bounding box
+MAP_BOUNDS = {
+    "west":  -87.75778635009765,
+    "east":  -87.52089364990233,
+    "south": 41.83906339136601,
+    "north": 42.00969814958818,
+}
+
+MAP_ZOOM = 12
+
+# Region: Chicago, IL (regionId 17426, regionType 6)
+REGION_SELECTION = [{"regionId": 17426, "regionType": 6}]
+
+FILTER_DEFAULTS = {
+    "isForSaleByAgent":    False,
+    "isForSaleByOwner":    False,
+    "isNewConstruction":   False,
+    "isComingSoon":        False,
+    "isAuction":           False,
+    "isForSaleForeclosure": False,
+    "inUnitLaundry":       True,
+    "parkingAvailable":    True,
+}
+
+
+def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None):
+    return {
+        "searchQueryState": {
+            "pagination": {},
+            "isMapVisible": True,
+            "mapBounds": MAP_BOUNDS,
+            "mapZoom": MAP_ZOOM,
+            "regionSelection": REGION_SELECTION,
+            "filterState": {
+                "isForRent":                  {"value": True},
+                "isForSaleByAgent":           {"value": FILTER_DEFAULTS["isForSaleByAgent"]},
+                "isForSaleByOwner":           {"value": FILTER_DEFAULTS["isForSaleByOwner"]},
+                "isNewConstruction":          {"value": FILTER_DEFAULTS["isNewConstruction"]},
+                "isComingSoon":               {"value": FILTER_DEFAULTS["isComingSoon"]},
+                "isAuction":                  {"value": FILTER_DEFAULTS["isAuction"]},
+                "isForSaleForeclosure":       {"value": FILTER_DEFAULTS["isForSaleForeclosure"]},
+                "monthlyPayment":             {"min": min_rent, "max": max_rent},
+                "beds":                       {"min": min_beds, "max": max_beds},
+                "baths":                      {"min": min_baths, "max": max_baths},
+                "onlyRentalInUnitLaundry":    {"value": FILTER_DEFAULTS["inUnitLaundry"]},
+                "onlyRentalParkingAvailable": {"value": FILTER_DEFAULTS["parkingAvailable"]},
+            },
+            "isListVisible": True,
+        },
+        "wants": {
+            "cat1": ["mapResults"],
+        },
+        "requestId": 2,
+        "isDebugRequest": False,
+    }
+
+
+async def scrape_zillow(filters: dict) -> list[dict]:
+    max_rent = filters.get("maxRent")
+    min_rent = filters.get("minRent", 0)
+    bedrooms = filters.get("bedrooms")
+    max_bedrooms = filters.get("maxBedrooms", bedrooms)
+    min_baths = filters.get("minBaths")
+    max_baths = filters.get("maxBaths")
+
+    payload = build_payload(
+        max_rent=max_rent,
+        min_rent=min_rent,
+        min_beds=bedrooms,
+        max_beds=max_bedrooms,
+        min_baths=min_baths,
+        max_baths=max_baths,
+    )
+
+    body = json.dumps(payload).encode("utf-8")
+
+    req = urllib.request.Request(
+        ZILLOW_API_URL,
+        data=body,
+        method="PUT",
+        headers={
+            "accept":          "*/*",
+            "accept-language": "en-US,en;q=0.9",
+            "content-type":    "application/json",
+            "content-length":  str(len(body)),
+            "sec-fetch-dest":  "empty",
+            "sec-fetch-mode":  "cors",
+            "sec-fetch-site":  "same-origin",
+            "user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"Zillow request error: {e}")
+        return []
+
+    results = (data.get("cat1") or {}).get("searchResults", {}).get("mapResults", [])
+    listings = []
+
+    for r in results:
+        price_raw = r.get("price") or r.get("unformattedPrice") or ""
+        numeric_price = re.sub(r"\D", "", str(price_raw))
+        if not numeric_price:
+            continue
+
+        listings.append({
+            "title":     r.get("address", ""),
+            "price":     f"${numeric_price}/mo",
+            "location":  f"{r.get('addressCity', '')}, {r.get('addressState', '')}",
+            "url":       f"https://www.zillow.com{r.get('detailUrl', '')}",
+            "beds":      r.get("beds", ""),
+            "baths":     r.get("baths", ""),
+            "sqft":      r.get("area", ""),
+            "source":    "Zillow",
+            "scrapedAt": datetime.now(timezone.utc).isoformat(),
+        })
+
+    return listings

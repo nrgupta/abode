@@ -1,17 +1,20 @@
-module.exports = {
-  search: {
-    city: "Chicago, IL",
-    maxRent: 2000,
-    bedrooms: 2,
-  },
-  preferredNeighborhoods: [
+import os
+
+search = {
+    "city": "Chicago, IL",
+    "maxRent": 2000,
+    "bedrooms": 2,
+}
+
+preferred_neighborhoods = [
     "Wicker Park",
     "Logan Square",
     "Lincoln Park",
     "Lakeview",
     "West Loop",
-  ],
-  bonusKeywords: [
+]
+
+bonus_keywords = [
     "hardwood floors",
     "in-unit laundry",
     "dishwasher",
@@ -20,16 +23,18 @@ module.exports = {
     "parking",
     "pet friendly",
     "no fee",
-  ],
-  redFlagKeywords: [
+]
+
+red_flag_keywords = [
     "no pets",
     "utilities not included",
     "income verification",
     "guarantor required",
-  ],
-  sheets: {
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    sheetName: "Listings",
-  },
-  schedule: "0 21 * * *",
-};
+]
+
+sheets = {
+    "spreadsheetId": os.environ.get("GOOGLE_SHEET_ID", ""),
+    "sheetName": "Listings",
+}
+
+schedule = "0 21 * * *"
