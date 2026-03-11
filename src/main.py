@@ -10,7 +10,7 @@ load_dotenv()
 
 import config
 from scrapers.craigslist import scrape_craigslist
-from scrapers.redfin import scrape_apartments
+from scrapers.redfin import scrape_redfin
 from scrapers.zillow import scrape_zillow
 
 
@@ -25,7 +25,7 @@ async def main():
     print("Scraping all sources...")
     cl, ap, zl = await asyncio.gather(
         scrape_craigslist(filters),
-        scrape_apartments(filters),
+        scrape_redfin(filters),
         scrape_zillow(filters),
         return_exceptions=True,
     )

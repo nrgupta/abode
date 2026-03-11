@@ -1,6 +1,8 @@
 import json
 import os
 
+import httplib2
+import google_auth_httplib2
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
@@ -21,7 +23,9 @@ def get_service():
     credentials_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "{}")
     credentials_info = json.loads(credentials_json)
     creds = Credentials.from_service_account_info(credentials_info, scopes=SCOPES)
-    return build("sheets", "v4", credentials=creds)
+    http = httplib2.Http(disable_ssl_certificate_validation=True)
+    authorized_http = google_auth_httplib2.AuthorizedHttp(creds, http=http)
+    return build("sheets", "v4", http=authorized_http)
 
 
 def listing_to_row(listing: dict) -> list:

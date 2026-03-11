@@ -1,5 +1,6 @@
 import json
 import re
+import ssl
 import urllib.request
 from datetime import datetime, timezone
 
@@ -97,8 +98,12 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         },
     )
 
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, context=ssl_ctx) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         print(f"Zillow request error: {e}")

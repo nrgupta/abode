@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 
 
-async def scrape_apartments(filters: dict) -> list[dict]:
+async def scrape_redfin(filters: dict) -> list[dict]:
     max_rent = filters.get("maxRent")
     bedrooms = filters.get("bedrooms")
     min_baths = filters.get("minBaths")

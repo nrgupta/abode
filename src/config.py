@@ -2,8 +2,11 @@ import os
 
 search = {
     "city": "Chicago, IL",
-    "maxRent": 2000,
-    "bedrooms": 2,
+    "max_price": 4200,
+    "min_bedrooms": 2,
+    "max_bedrooms": 2,
+    "min_bathrooms": 2,
+    "max_bathrooms": 2,
 }
 
 preferred_neighborhoods = [
