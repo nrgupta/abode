@@ -1,13 +1,27 @@
 import os
 
-search = {
+search2by2 = {
     "city": "Chicago, IL",
-    "max_price": 4200,
-    "min_bedrooms": 2,
-    "max_bedrooms": 2,
-    "min_bathrooms": 2,
-    "max_bathrooms": 2,
+    "maxRent": 4200,
+    "bedrooms": 2,
+    "maxBedrooms": 2,
+    "minBaths": 2,
+    "maxBaths": 2,
+    "minSqft": 900,
 }
+
+search1by1 = {
+    "city": "Chicago, IL",
+    "maxRent": 2200,
+    "bedrooms": 1,
+    "maxBedrooms": 1,
+    "minBaths": 1,
+    "maxBaths": 1,
+    "minSqft": 500,
+}
+
+# Default search configuration
+search = search2by2
 
 preferred_neighborhoods = [
     "Wicker Park",
@@ -37,7 +51,8 @@ red_flag_keywords = [
 
 sheets = {
     "spreadsheetId": os.environ.get("GOOGLE_SHEET_ID", ""),
-    "sheetName": "Listings",
+    "2by2": "2by2",
+    "1by1": "1by1",
 }
 
-schedule = "0 21 * * *"
+schedule = "30 20 * * *"
