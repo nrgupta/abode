@@ -2,7 +2,7 @@ name: Apartment Finder — Daily Run
 
 on:
   schedule:
-    - cron: "0 21 * * *"   # 3:00 PM CST = 21:00 UTC
+    - cron: "30 20 * * *"   # 3:30 PM CST = 20:30 UTC
   workflow_dispatch:
 
 jobs:

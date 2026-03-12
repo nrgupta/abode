@@ -11,9 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 HEADERS = [
-    "Score", "Title", "Price", "Location", "Beds", "Baths", "Sqft",
-    "Summary", "Bonus Flags", "Red Flags", "Neighborhood Match",
-    "Within Budget", "Source", "URL", "Scraped At",
+    "Address", "URL", "Rent", "Sqft", "Source",
 ]
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -30,28 +28,18 @@ def get_service():
 
 def listing_to_row(listing: dict) -> list:
     return [
-        listing.get("score", ""),
-        listing.get("title", ""),
-        listing.get("price", ""),
         listing.get("location", ""),
-        listing.get("beds", ""),
-        listing.get("baths", ""),
-        listing.get("sqft", ""),
-        listing.get("summary", ""),
-        ", ".join(listing.get("bonusFlags") or []),
-        ", ".join(listing.get("redFlags") or []),
-        "✅" if listing.get("neighborhoodMatch") else "❌",
-        "✅" if listing.get("withinBudget") else "❌",
-        listing.get("source", ""),
         listing.get("url", ""),
-        listing.get("scrapedAt", ""),
+        listing.get("price", ""),
+        listing.get("sqft", ""),
+        listing.get("source", ""),
     ]
 
 
-async def sync_to_sheets(listings: list[dict]) -> None:
+async def sync_to_sheets(listings: list[dict], sheet_key: str = "2by2") -> None:
     service = get_service()
     spreadsheet_id = config.sheets["spreadsheetId"]
-    sheet_name = config.sheets["sheetName"]
+    sheet_name = config.sheets[sheet_key]
 
     # Get spreadsheet metadata
     meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
@@ -63,61 +51,38 @@ async def sync_to_sheets(listings: list[dict]) -> None:
             spreadsheetId=spreadsheet_id,
             body={"requests": [{"addSheet": {"properties": {"title": sheet_name}}}]},
         ).execute()
-        # Add headers
-        service.spreadsheets().values().update(
-            spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!A1",
-            valueInputOption="RAW",
-            body={"values": [HEADERS]},
-        ).execute()
         # Refresh metadata
         meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
 
-    # Clear existing data rows
-    service.spreadsheets().values().clear(
+    # Always update headers
+    service.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
-        range=f"{sheet_name}!A2:Z10000",
+        range=f"{sheet_name}!A1",
+        valueInputOption="RAW",
+        body={"values": [HEADERS]},
     ).execute()
 
-    # Write new listings
-    if listings:
-        service.spreadsheets().values().update(
+    # Get existing listings
+    existing_data = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"{sheet_name}!B:B",
+    ).execute()
+    existing_urls = set()
+    if "values" in existing_data and len(existing_data["values"]) > 1:
+        # Skip header row (index 0)
+        existing_urls = {row[0].lower().strip() for row in existing_data["values"][1:] if row}
+
+    # Filter to only new listings
+    new_listings = [l for l in listings if l.get("url", "").lower().strip() not in existing_urls]
+
+    # Append new listings
+    if new_listings:
+        service.spreadsheets().values().append(
             spreadsheetId=spreadsheet_id,
             range=f"{sheet_name}!A2",
             valueInputOption="RAW",
-            body={"values": [listing_to_row(l) for l in listings]},
+            body={"values": [listing_to_row(l) for l in new_listings]},
         ).execute()
-
-    # Highlight top 3 listings in green
-    top_count = min(3, len(listings))
-    if top_count > 0:
-        sheet_id = next(
-            (s["properties"]["sheetId"] for s in meta.get("sheets", []) if s["properties"]["title"] == sheet_name),
-            0,
-        )
-        requests = [
-            {
-                "repeatCell": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "startRowIndex": i + 1,
-                        "endRowIndex": i + 2,
-                        "startColumnIndex": 0,
-                        "endColumnIndex": len(HEADERS),
-                    },
-                    "cell": {
-                        "userEnteredFormat": {
-                            "backgroundColor": {"red": 0.85, "green": 0.96, "blue": 0.85}
-                        }
-                    },
-                    "fields": "userEnteredFormat.backgroundColor",
-                }
-            }
-            for i in range(top_count)
-        ]
-        service.spreadsheets().batchUpdate(
-            spreadsheetId=spreadsheet_id,
-            body={"requests": requests},
-        ).execute()
-
-    print(f"\nSynced {len(listings)} listings → https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+        print(f"\nAdded {len(new_listings)} new listings → https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+    else:
+        print(f"\nNo new listings to add → https://docs.google.com/spreadsheets/d/{spreadsheet_id}")

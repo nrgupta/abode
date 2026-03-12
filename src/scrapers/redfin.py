@@ -28,11 +28,11 @@ async def scrape_redfin(filters: dict) -> list[dict]:
         page = await context.new_page()
 
         try:
-            await page.goto(url, wait_until="networkidle", timeout=30000)
+            await page.goto(url, wait_until="load", timeout=30000)
             await page.wait_for_timeout(4000)
 
             results = await page.evaluate("""() => {
-                return Array.from(document.querySelectorAll('.HomeCardContainer')).map(el => {
+                const results = Array.from(document.querySelectorAll('.HomeCardContainer')).map(el => {
                     const address =
                         el.querySelector('.homeAddressV2')?.innerText?.trim() ||
                         el.querySelector("[data-rf-test-id='abp-streetLine']")?.innerText?.trim() ||
@@ -57,9 +57,16 @@ async def scrape_redfin(filters: dict) -> list[dict]:
                         sqft: sqftMatch ? sqftMatch[1] : '',
                         source: 'Redfin',
                         scrapedAt: new Date().toISOString(),
+                        _debug_stats: stats,
                     };
                 }).filter(l => l.url && l.price);
+                return results;
             }""")
+
+            print(f"DEBUG Redfin: Found {len(results)} listings")
+            if results:
+                print(f"DEBUG Redfin first result stats: {results[0].get('_debug_stats')}")
+                print(f"DEBUG Redfin first result: {results[0]}")
 
             listings.extend(results)
 

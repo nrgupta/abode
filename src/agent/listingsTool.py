@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scrapers.craigslist import scrape_craigslist
 from scrapers.redfin import scrape_redfin
 from scrapers.zillow import scrape_zillow
-from config import search as default_search
+from config import search2by2, search1by1
+from sheets.google_sheets import sync_to_sheets
 
 
 def deduplicate_listings(listings: list[dict]) -> list[dict]:
@@ -52,5 +53,11 @@ async def run_agent(filters: dict, sources: list[str] | None = None) -> list[dic
     return unique
 
 
-async def run_daily_agent() -> list[dict]:
-    return await run_agent(default_search, sources=["redfin", "zillow"])
+async def run_daily_agent() -> None:
+    # Scrape 2by2 apartments
+    listings_2by2 = await run_agent(search2by2, sources=["zillow"])
+    await sync_to_sheets(listings_2by2, sheet_key="2by2")
+
+    # Scrape 1by1 apartments
+    listings_1by1 = await run_agent(search1by1, sources=["zillow"])
+    await sync_to_sheets(listings_1by1, sheet_key="1by1")

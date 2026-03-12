@@ -34,6 +34,11 @@ async def scrape_craigslist(filters: dict) -> list[dict]:
                         '';
                     const neighborhood = hood.replace(/^\\(|\\)$/g, '').trim();
                     const location = neighborhood ? `${neighborhood}, Chicago, IL` : 'Chicago, IL';
+
+                    const housing = el.querySelector('.housing')?.innerText?.trim() || '';
+                    const bedsMatch = housing.match(/(\\d+)\\s*br/i);
+                    const bathsMatch = housing.match(/(\\d+(?:\\.\\d+)?)\\s*ba/i);
+
                     return {
                         title:
                             el.querySelector('a.posting-title .label')?.innerText?.trim() ||
@@ -43,6 +48,8 @@ async def scrape_craigslist(filters: dict) -> list[dict]:
                         price:     el.querySelector('.priceinfo')?.innerText?.trim() || '',
                         location,
                         url:       el.querySelector('a.posting-title')?.href || '',
+                        beds:      bedsMatch ? bedsMatch[1] : '',
+                        baths:     bathsMatch ? bathsMatch[1] : '',
                         source:    'Craigslist',
                         scrapedAt: new Date().toISOString(),
                     };

@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 
 ZILLOW_API_URL = "https://www.zillow.com/async-create-search-page-state"
 
-# Chicago bounding box
+# Ideal Living Area bounding box
 MAP_BOUNDS = {
-    "west":  -87.75778635009765,
-    "east":  -87.52089364990233,
-    "south": 41.83906339136601,
-    "north": 42.00969814958818,
+    "west":  -87.68248435944328,
+    "east":  -87.61708137482414,
+    "south": 41.90064568672503,
+    "north": 41.944582838604454,
 }
 
 MAP_ZOOM = 12
@@ -31,7 +31,25 @@ FILTER_DEFAULTS = {
 }
 
 
-def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None):
+def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None, min_sqft=None, max_sqft=None):
+    filter_state = {
+        "isForRent":                  {"value": True},
+        "isForSaleByAgent":           {"value": FILTER_DEFAULTS["isForSaleByAgent"]},
+        "isForSaleByOwner":           {"value": FILTER_DEFAULTS["isForSaleByOwner"]},
+        "isNewConstruction":          {"value": FILTER_DEFAULTS["isNewConstruction"]},
+        "isComingSoon":               {"value": FILTER_DEFAULTS["isComingSoon"]},
+        "isAuction":                  {"value": FILTER_DEFAULTS["isAuction"]},
+        "isForSaleForeclosure":       {"value": FILTER_DEFAULTS["isForSaleForeclosure"]},
+        "monthlyPayment":             {"min": min_rent, "max": max_rent},
+        "beds":                       {"min": min_beds, "max": max_beds},
+        "baths":                      {"min": min_baths, "max": max_baths},
+        "onlyRentalInUnitLaundry":    {"value": FILTER_DEFAULTS["inUnitLaundry"]},
+        "onlyRentalParkingAvailable": {"value": FILTER_DEFAULTS["parkingAvailable"]},
+    }
+
+    if min_sqft or max_sqft:
+        filter_state["sqft"] = {k: v for k, v in {"min": min_sqft, "max": max_sqft}.items() if v is not None}
+
     return {
         "searchQueryState": {
             "pagination": {},
@@ -39,20 +57,7 @@ def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=
             "mapBounds": MAP_BOUNDS,
             "mapZoom": MAP_ZOOM,
             "regionSelection": REGION_SELECTION,
-            "filterState": {
-                "isForRent":                  {"value": True},
-                "isForSaleByAgent":           {"value": FILTER_DEFAULTS["isForSaleByAgent"]},
-                "isForSaleByOwner":           {"value": FILTER_DEFAULTS["isForSaleByOwner"]},
-                "isNewConstruction":          {"value": FILTER_DEFAULTS["isNewConstruction"]},
-                "isComingSoon":               {"value": FILTER_DEFAULTS["isComingSoon"]},
-                "isAuction":                  {"value": FILTER_DEFAULTS["isAuction"]},
-                "isForSaleForeclosure":       {"value": FILTER_DEFAULTS["isForSaleForeclosure"]},
-                "monthlyPayment":             {"min": min_rent, "max": max_rent},
-                "beds":                       {"min": min_beds, "max": max_beds},
-                "baths":                      {"min": min_baths, "max": max_baths},
-                "onlyRentalInUnitLaundry":    {"value": FILTER_DEFAULTS["inUnitLaundry"]},
-                "onlyRentalParkingAvailable": {"value": FILTER_DEFAULTS["parkingAvailable"]},
-            },
+            "filterState": filter_state,
             "isListVisible": True,
         },
         "wants": {
@@ -70,6 +75,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
     max_bedrooms = filters.get("maxBedrooms", bedrooms)
     min_baths = filters.get("minBaths")
     max_baths = filters.get("maxBaths")
+    min_sqft = filters.get("minSqft")
+    max_sqft = filters.get("maxSqft")
 
     payload = build_payload(
         max_rent=max_rent,
@@ -78,6 +85,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         max_beds=max_bedrooms,
         min_baths=min_baths,
         max_baths=max_baths,
+        min_sqft=min_sqft,
+        max_sqft=max_sqft,
     )
 
     body = json.dumps(payload).encode("utf-8")
@@ -121,11 +130,11 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         listings.append({
             "title":     r.get("address", ""),
             "price":     f"${numeric_price}/mo",
-            "location":  f"{r.get('addressCity', '')}, {r.get('addressState', '')}",
+            "location":  r.get("address", ""),
             "url":       f"https://www.zillow.com{r.get('detailUrl', '')}",
-            "beds":      r.get("beds", ""),
-            "baths":     r.get("baths", ""),
-            "sqft":      r.get("area", ""),
+            "beds":      r.get("minBeds", ""),
+            "baths":     r.get("minBaths", ""),
+            "sqft":      r.get("minArea", ""),
             "source":    "Zillow",
             "scrapedAt": datetime.now(timezone.utc).isoformat(),
         })
