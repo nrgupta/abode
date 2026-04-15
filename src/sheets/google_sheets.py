@@ -54,35 +54,25 @@ async def sync_to_sheets(listings: list[dict], sheet_key: str = "2by2") -> None:
         # Refresh metadata
         meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
 
-    # Always update headers
+    # Get sheet id for clear operation
+    sheet_id = next(
+        s["properties"]["sheetId"]
+        for s in meta.get("sheets", [])
+        if s["properties"]["title"] == sheet_name
+    )
+
+    # Clear all existing data
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": [{"updateCells": {"range": {"sheetId": sheet_id}, "fields": "userEnteredValue"}}]},
+    ).execute()
+
+    # Write headers and all listings
+    rows = [HEADERS] + [listing_to_row(l) for l in listings]
     service.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
         range=f"{sheet_name}!A1",
         valueInputOption="RAW",
-        body={"values": [HEADERS]},
+        body={"values": rows},
     ).execute()
-
-    # Get existing listings
-    existing_data = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id,
-        range=f"{sheet_name}!B:B",
-    ).execute()
-    existing_urls = set()
-    if "values" in existing_data and len(existing_data["values"]) > 1:
-        # Skip header row (index 0)
-        existing_urls = {row[0].lower().strip() for row in existing_data["values"][1:] if row}
-
-    # Filter to only new listings
-    new_listings = [l for l in listings if l.get("url", "").lower().strip() not in existing_urls]
-
-    # Append new listings
-    if new_listings:
-        service.spreadsheets().values().append(
-            spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!A2",
-            valueInputOption="RAW",
-            body={"values": [listing_to_row(l) for l in new_listings]},
-        ).execute()
-        print(f"\nAdded {len(new_listings)} new listings → https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
-    else:
-        print(f"\nNo new listings to add → https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+    print(f"\nWrote {len(listings)} listings → https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
