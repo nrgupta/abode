@@ -11,10 +11,24 @@ load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.listingsTool import run_daily_agent
-from sheets.google_sheets import sync_to_sheets
 
 
-def send_email(listings):
+def format_section(title: str, listings: list) -> str:
+    section = f"{title} ({len(listings)} new):\n"
+    section += "=" * 50 + "\n"
+    if not listings:
+        section += "No new listings.\n"
+    else:
+        for listing in listings:
+            section += f"\n{listing.get('title', 'N/A')}\n"
+            section += f"Price: {listing.get('price', 'N/A')} | Location: {listing.get('location', 'N/A')}\n"
+            if listing.get("beds"):
+                section += f"Beds: {listing['beds']} | Baths: {listing.get('baths', 'N/A')} | Sqft: {listing.get('sqft', 'N/A')}\n"
+            section += f"URL: {listing.get('url', 'N/A')}\n"
+    return section
+
+
+def send_email(new_2by2: list, new_1by1: list):
     """Send email with new listings to neilg2001@gmail.com"""
     sender_email = os.getenv("GMAIL_ADDRESS")
     sender_password = os.getenv("GMAIL_APP_PASSWORD")
@@ -24,28 +38,18 @@ def send_email(listings):
         print("Warning: Email credentials not configured (GMAIL_ADDRESS, GMAIL_APP_PASSWORD)")
         return
 
+    total = len(new_2by2) + len(new_1by1)
+
     # Build email body
-    if not listings:
-        body = "No listings found today."
-        subject = "Apartment Finder - No listings found"
+    if total == 0:
+        body = "No new listings found today."
+        subject = "Apartment Finder - No new listings"
     else:
         body = "New apartment listings found:\n\n"
-
-        by_source: dict[str, list] = {}
-        for listing in listings:
-            by_source.setdefault(listing.get("source", "Unknown"), []).append(listing)
-
-        for source, source_listings in by_source.items():
-            body += f"\n{source} ({len(source_listings)} listings):\n"
-            body += "-" * 50 + "\n"
-            for listing in source_listings:
-                body += f"\n{listing.get('title', 'N/A')}\n"
-                body += f"Price: {listing.get('price', 'N/A')} | Location: {listing.get('location', 'N/A')}\n"
-                if listing.get("beds"):
-                    body += f"Beds: {listing['beds']} | Baths: {listing.get('baths', 'N/A')} | Sqft: {listing.get('sqft', 'N/A')}\n"
-                body += f"URL: {listing.get('url', 'N/A')}\n"
-
-        subject = f"Apartment Finder - {len(listings)} new listings"
+        body += format_section("2 Bed / 2 Bath", new_2by2)
+        body += "\n"
+        body += format_section("1 Bed / 1 Bath", new_1by1)
+        subject = f"Apartment Finder - {total} new listings"
 
     try:
         msg = MIMEMultipart("alternative")
@@ -65,12 +69,8 @@ def send_email(listings):
 
 async def main():
     print("Running daily apartment search...")
-    listings = await run_daily_agent()
-
-    if listings:
-        await sync_to_sheets(listings)
-
-    send_email(listings)
+    new_2by2, new_1by1 = await run_daily_agent()
+    send_email(new_2by2, new_1by1)
 
 
 if __name__ == "__main__":

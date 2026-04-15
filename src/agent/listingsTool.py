@@ -53,13 +53,13 @@ async def run_agent(filters: dict, sources: list[str] | None = None) -> list[dic
     return unique
 
 
-async def run_daily_agent() -> list[dict]:
+async def run_daily_agent() -> tuple[list[dict], list[dict]]:
     # Scrape 2by2 apartments
     listings_2by2 = await run_agent(search2by2, sources=["zillow"])
-    await sync_to_sheets(listings_2by2, sheet_key="2by2")
+    new_2by2 = await sync_to_sheets(listings_2by2, sheet_key="2by2")
 
     # Scrape 1by1 apartments
     listings_1by1 = await run_agent(search1by1, sources=["zillow"])
-    await sync_to_sheets(listings_1by1, sheet_key="1by1")
+    new_1by1 = await sync_to_sheets(listings_1by1, sheet_key="1by1")
 
-    return listings_2by2 + listings_1by1
+    return new_2by2, new_1by1
