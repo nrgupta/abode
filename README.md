@@ -1,6 +1,17 @@
-# Chicago Apartment Finder
+# Abode
 
-Scrapes Zillow, Redfin, and Craigslist for Chicago rentals. Syncs listings to Google Sheets and sends daily email summaries. Runs automatically every day at 3:30 PM CST via launchd.
+A Chicago apartment finder with a swipe-based mobile UI prototype. Scrapes Zillow, Redfin, and Craigslist for Chicago rentals, syncs listings to Google Sheets, and sends daily email summaries. Runs automatically every day at 3:30 PM CST via launchd.
+
+## Mobile UI Prototype
+
+`abode_dark_prototype_v2.html` — open in any browser to preview a Tinder-style mobile app concept with 6 screens:
+
+- **Sign up** — account creation
+- **Location** — city, rent range, beds/baths, sq ft
+- **Amenities** — toggle must-haves and lease length
+- **Swipe** — swipe-style card UI with match % scoring
+- **Saved** — list of liked apartments
+- **Profile** — user info, search criteria, and taste-learning panel
 
 ## Sources
 - **Zillow** — API-based, Chicago-wide
