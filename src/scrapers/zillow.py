@@ -135,6 +135,7 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "beds":      r.get("minBeds", ""),
             "baths":     r.get("minBaths", ""),
             "sqft":      r.get("minArea", ""),
+            "image":     r.get("imgSrc", ""),
             "source":    "Zillow",
             "scrapedAt": datetime.now(timezone.utc).isoformat(),
         })

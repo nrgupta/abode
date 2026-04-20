@@ -39,6 +39,7 @@ async def scrape_craigslist(filters: dict) -> list[dict]:
                     const bedsMatch = housing.match(/(\\d+)\\s*br/i);
                     const bathsMatch = housing.match(/(\\d+(?:\\.\\d+)?)\\s*ba/i);
 
+                    const img = el.querySelector('img')?.src || '';
                     return {
                         title:
                             el.querySelector('a.posting-title .label')?.innerText?.trim() ||
@@ -50,6 +51,7 @@ async def scrape_craigslist(filters: dict) -> list[dict]:
                         url:       el.querySelector('a.posting-title')?.href || '',
                         beds:      bedsMatch ? bedsMatch[1] : '',
                         baths:     bathsMatch ? bathsMatch[1] : '',
+                        image:     img,
                         source:    'Craigslist',
                         scrapedAt: new Date().toISOString(),
                     };

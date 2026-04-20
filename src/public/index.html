@@ -3,417 +3,976 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Apartment Finder</title>
+  <title>Abode</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f7;
-      color: #1d1d1f;
-      min-height: 100vh;
+    :root {
+      --bg:           #0f0f12;
+      --bg2:          #18181f;
+      --bg3:          #22222c;
+      --border:       rgba(255,255,255,0.08);
+      --border2:      rgba(255,255,255,0.14);
+      --text:         #f0eefc;
+      --text2:        #9e9db5;
+      --text3:        #5f5e72;
+      --green:        #1D9E75;
+      --green-light:  #5DCAA5;
+      --green-dim:    #0a2e22;
+      --red:          #c94444;
+      --blue:         #5b9fd6;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    header {
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      padding: 18px 32px;
+    html, body {
+      height: 100%;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── Screens ── */
+    .screen { display: none; flex-direction: column; height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── Top bar ── */
+    .top-bar {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 10px;
-    }
-    header h1 { font-size: 1.2rem; font-weight: 600; }
-    header span { font-size: 1.4rem; }
-
-    .layout {
-      display: flex;
-      min-height: calc(100vh - 61px);
-    }
-
-    /* ── Sidebar ── */
-    aside {
-      width: 300px;
+      padding: 18px 24px 10px;
       flex-shrink: 0;
-      background: #fff;
-      border-right: 1px solid #e0e0e0;
-      padding: 24px 20px;
+    }
+    .logo-bar { display: flex; align-items: center; gap: 8px; }
+    .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .logo-text { font-size: 20px; font-weight: 500; color: var(--text); letter-spacing: -0.5px; }
+    .top-count { font-size: 12px; color: var(--text3); }
+
+    /* ── Scrollable content ── */
+    .content {
+      flex: 1;
+      padding: 4px 24px 24px;
       display: flex;
       flex-direction: column;
-      gap: 28px;
-    }
-
-    .section-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: #888;
-      margin-bottom: 10px;
-    }
-
-    /* Sources checkboxes */
-    .source-list { display: flex; flex-direction: column; gap: 10px; }
-    .source-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-    }
-    .source-item input[type="checkbox"] {
-      width: 17px; height: 17px;
-      accent-color: #0071e3;
-      cursor: pointer;
-    }
-    .source-item label {
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .source-badge {
-      font-size: 0.68rem;
-      font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: #f0f0f0;
-      color: #555;
-    }
-
-    /* Inputs */
-    .field { display: flex; flex-direction: column; gap: 6px; }
-    .field label { font-size: 0.85rem; font-weight: 500; color: #444; }
-    .field input {
-      border: 1px solid #d0d0d0;
-      border-radius: 8px;
-      padding: 9px 12px;
-      font-size: 0.95rem;
-      outline: none;
-      transition: border-color .15s;
-      width: 100%;
-    }
-    .field input:focus { border-color: #0071e3; }
-
-    .field-row { display: flex; gap: 10px; }
-    .field-row .field { flex: 1; }
-
-    /* Search button */
-    button#searchBtn {
-      width: 100%;
-      padding: 11px;
-      background: #0071e3;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background .15s, opacity .15s;
-    }
-    button#searchBtn:hover { background: #005bbf; }
-    button#searchBtn:disabled { opacity: .5; cursor: not-allowed; }
-
-    /* ── Main content ── */
-    main {
-      flex: 1;
-      padding: 28px 32px;
+      gap: 16px;
       overflow-y: auto;
     }
 
-    .status-bar {
-      font-size: 0.85rem;
-      color: #888;
-      margin-bottom: 18px;
-      min-height: 20px;
+    .sec-title { font-size: 20px; font-weight: 500; color: var(--text); }
+    .sec-sub { font-size: 14px; color: var(--text2); margin-top: 3px; }
+
+    /* ── Labels ── */
+    .label {
+      font-size: 11px;
+      color: var(--text3);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
     }
 
-    /* Source sections */
-    .source-section { margin-bottom: 36px; }
-    .source-section h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* ── Inputs ── */
+    .inp {
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 15px;
+      color: var(--text);
+      width: 100%;
+      font-family: var(--font);
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
     }
-    .count-badge {
-      font-size: 0.75rem;
-      font-weight: 600;
-      background: #e8f0fe;
-      color: #0071e3;
-      padding: 2px 8px;
+    .inp:focus { border-color: var(--green); }
+    .inp::placeholder { color: var(--text3); }
+
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ── Pills ── */
+    .pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      padding: 8px 16px;
       border-radius: 20px;
+      font-size: 13px;
+      border: 0.5px solid var(--border2);
+      background: var(--bg2);
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .pill.on {
+      background: var(--green-dim);
+      border-color: var(--green);
+      color: var(--green-light);
+      font-weight: 500;
     }
 
-    /* Cards grid */
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 14px;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid #e5e5e5;
+    /* ── Buttons ── */
+    .cta {
+      background: var(--green);
+      color: #fff;
+      border: none;
       border-radius: 12px;
-      padding: 16px;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      font-family: var(--font);
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .cta:hover:not(:disabled) { background: #0F6E56; }
+    .cta:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .cta-ghost {
+      background: transparent;
+      border: 0.5px solid var(--border2);
+      color: var(--text2);
+      border-radius: 12px;
+      padding: 15px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+      font-family: var(--font);
+      transition: border-color 0.15s;
+    }
+    .cta-ghost:hover { border-color: var(--text3); }
+
+    .small-link {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text3);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    /* ── Bottom nav ── */
+    .nav {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 12px 0 28px;
+      border-top: 0.5px solid var(--border);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+    .nav-item {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      transition: box-shadow .15s;
-    }
-    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
-
-    .card-title {
-      font-size: 0.9rem;
-      font-weight: 600;
-      line-height: 1.3;
-      color: #1d1d1f;
-    }
-
-    .card-price {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #0071e3;
-    }
-
-    .card-location {
-      font-size: 0.8rem;
-      color: #666;
-      display: flex;
       align-items: center;
       gap: 4px;
+      cursor: pointer;
+      padding: 4px 24px;
+      transition: opacity 0.15s;
     }
+    .nav-icon { font-size: 20px; color: var(--text3); transition: color 0.15s; }
+    .nav-lbl  { font-size: 10px; color: var(--text3); letter-spacing: 0.3px; transition: color 0.15s; }
+    .nav-item.on .nav-icon,
+    .nav-item.on .nav-lbl { color: var(--green); }
 
-    .card-meta {
+    /* ─────────────────────────────
+       SETUP SCREEN
+    ───────────────────────────── */
+    #s-setup .content { justify-content: center; max-width: 480px; margin: 0 auto; width: 100%; }
+
+    /* ─────────────────────────────
+       SWIPE SCREEN
+    ───────────────────────────── */
+    .swipe-area {
+      flex: 1;
       display: flex;
-      gap: 10px;
-      font-size: 0.78rem;
-      color: #555;
-      flex-wrap: wrap;
-    }
-    .card-meta span {
-      background: #f5f5f7;
-      padding: 3px 8px;
-      border-radius: 6px;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 4px 20px 12px;
+      overflow: hidden;
     }
 
-    .card-link {
-      display: inline-block;
-      margin-top: 4px;
-      font-size: 0.8rem;
-      color: #0071e3;
-      text-decoration: none;
+    .hint {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      width: 100%;
+      max-width: 460px;
+      padding: 0 6px;
+      color: var(--text3);
     }
-    .card-link:hover { text-decoration: underline; }
+    .hint .pass-hint { color: var(--red); }
+    .hint .save-hint { color: var(--green); }
 
-    /* Empty / loading states */
-    .empty {
+    /* Apartment card */
+    .apt-card {
+      width: 100%;
+      max-width: 460px;
+      border-radius: 20px;
+      background: var(--bg2);
+      border: 0.5px solid var(--border2);
+      overflow: hidden;
+      position: relative;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      cursor: default;
+    }
+
+    .apt-photo {
+      height: 240px;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text3);
+      font-size: 48px;
+    }
+    .apt-photo img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .photo-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.7) 100%);
+    }
+
+    .badge-avail {
+      position: absolute;
+      top: 12px; left: 12px;
+      z-index: 3;
+      background: rgba(15,15,18,0.8);
+      color: var(--text);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 0.5px solid rgba(255,255,255,0.12);
+    }
+    .badge-source {
+      position: absolute;
+      top: 12px; right: 12px;
+      z-index: 3;
+      background: rgba(15,15,18,0.8);
+      color: var(--text2);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      border: 0.5px solid rgba(255,255,255,0.1);
+    }
+
+    .apt-body { padding: 16px; }
+    .apt-price { font-size: 24px; font-weight: 500; color: var(--text); }
+    .apt-addr  { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+    .apt-tags  { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+    .apt-tag {
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .swipe-ov {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 64px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+
+    /* Action buttons */
+    .btns {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 0;
+    }
+    .btn-swipe {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      border: 0.5px solid var(--border2);
+      background: var(--bg2);
+      cursor: pointer;
+      transition: transform 0.15s;
+      color: var(--text2);
+      user-select: none;
+    }
+    .btn-swipe:hover { transform: scale(1.1); }
+    .btn-pass { border-color: rgba(201,68,68,0.45); color: var(--red); }
+    .btn-save {
+      width: 68px; height: 68px;
+      font-size: 26px;
+      background: var(--green-dim);
+      border-color: rgba(29,158,117,0.45);
+      color: var(--green);
+    }
+    .btn-info { border-color: rgba(91,159,214,0.4); color: var(--blue); }
+
+    /* Empty / loading */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text3);
+      font-size: 14px;
       text-align: center;
-      color: #aaa;
-      font-size: 0.9rem;
-      padding: 60px 0;
+      padding: 40px 24px;
     }
+    .empty-icon { font-size: 44px; opacity: 0.35; }
 
     .spinner {
       display: inline-block;
-      width: 18px; height: 18px;
-      border: 2px solid #ccc;
-      border-top-color: #0071e3;
+      width: 22px; height: 22px;
+      border: 2px solid var(--bg3);
+      border-top-color: var(--green);
       border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
+      animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .error-msg {
-      color: #c0392b;
-      font-size: 0.85rem;
-      background: #fdf0ef;
-      border: 1px solid #f5c6c2;
-      border-radius: 8px;
-      padding: 10px 14px;
+    .error-toast {
+      background: rgba(201,68,68,0.12);
+      border: 0.5px solid rgba(201,68,68,0.3);
+      color: var(--red);
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 13px;
+      text-align: center;
     }
+
+    /* ─────────────────────────────
+       SAVED SCREEN
+    ───────────────────────────── */
+    .saved-hdr { padding: 4px 24px 12px; flex-shrink: 0; }
+
+    .saved-list {
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .saved-card {
+      display: flex;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 0.5px solid var(--border2);
+      background: var(--bg2);
+      transition: border-color 0.15s;
+    }
+    .saved-card:hover { border-color: var(--border2); }
+
+    .saved-thumb {
+      width: 88px;
+      min-height: 88px;
+      flex-shrink: 0;
+      background: var(--bg3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text3);
+      font-size: 24px;
+    }
+
+    .saved-body { padding: 12px 10px; flex: 1; min-width: 0; }
+    .saved-price { font-size: 15px; font-weight: 500; color: var(--text); }
+    .saved-addr  { font-size: 12px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .saved-tags  { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+    .saved-tag {
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--bg3);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .saved-actions {
+      padding: 10px 10px 10px 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .saved-btn {
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 0.5px solid var(--border2);
+      background: transparent;
+      color: var(--text2);
+      font-family: var(--font);
+      white-space: nowrap;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .saved-btn.view   { border-color: rgba(29,158,117,0.4); color: var(--green-light); }
+    .saved-btn.remove { border-color: rgba(201,68,68,0.3); color: var(--red); }
+
+    /* ─────────────────────────────
+       PROFILE SCREEN
+    ───────────────────────────── */
+    .prof-wrap {
+      padding: 4px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .ava-row { display: flex; align-items: center; gap: 16px; }
+    .ava {
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--green-light);
+      border: 1px solid rgba(29,158,117,0.3);
+      flex-shrink: 0;
+    }
+    .pname { font-size: 18px; font-weight: 500; color: var(--text); }
+    .psub  { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+    .pcard {
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .pchead {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .prow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .prow:last-child { border: none; }
+    .pkey { font-size: 13px; color: var(--text2); }
+    .pval { font-size: 13px; color: var(--text); font-weight: 500; text-align: right; max-width: 58%; }
   </style>
 </head>
 <body>
 
-<header>
-  <span>🏠</span>
-  <h1>Apartment Finder — Chicago</h1>
-</header>
-
-<div class="layout">
-
-  <!-- ── Sidebar ── -->
-  <aside>
-
-    <button id="searchBtn">Search</button>
+<!-- ════════════════════════════
+     SCREEN 1 — Setup
+════════════════════════════ -->
+<div class="screen active" id="s-setup">
+  <div class="top-bar">
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+  </div>
+  <div class="content">
+    <div>
+      <div class="sec-title">Find your next home</div>
+      <div class="sec-sub">Set your search criteria to start swiping</div>
+    </div>
 
     <div>
-      <div class="section-label">Sources</div>
-      <div class="source-list">
-        <div class="source-item">
-          <input type="checkbox" id="src-craigslist" value="craigslist" checked />
-          <label for="src-craigslist">Craigslist</label>
-        </div>
-        <div class="source-item">
-          <input type="checkbox" id="src-redfin" value="redfin" checked />
-          <label for="src-redfin">Redfin</label>
-        </div>
-        <div class="source-item">
-          <input type="checkbox" id="src-zillow" value="zillow" checked />
-          <label for="src-zillow">Zillow</label>
-        </div>
+      <div class="label">Max monthly rent</div>
+      <input class="inp" type="number" id="pref-maxRent" placeholder="4200" value="4200" />
+    </div>
+
+    <div class="row2">
+      <div>
+        <div class="label">Bedrooms</div>
+        <select class="inp" id="pref-beds">
+          <option value="1">1 bed</option>
+          <option value="2" selected>2 bed</option>
+          <option value="3">3 bed</option>
+        </select>
+      </div>
+      <div>
+        <div class="label">Min baths</div>
+        <select class="inp" id="pref-baths">
+          <option value="1">1 bath</option>
+          <option value="2" selected>2 bath</option>
+          <option value="3">3 bath</option>
+        </select>
       </div>
     </div>
 
     <div>
-      <div class="section-label">Bedrooms</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="minBeds">Min</label>
-          <input type="number" id="minBeds" min="0" max="10" value="2" placeholder="2" />
-        </div>
-        <div class="field">
-          <label for="maxBeds">Max</label>
-          <input type="number" id="maxBeds" min="0" max="10" value="2" placeholder="2" />
-        </div>
+      <div class="label">Sources</div>
+      <div class="pill-group" id="source-pills">
+        <div class="pill on" data-val="zillow"     onclick="this.classList.toggle('on')">Zillow</div>
+        <div class="pill on" data-val="redfin"     onclick="this.classList.toggle('on')">Redfin</div>
+        <div class="pill on" data-val="craigslist" onclick="this.classList.toggle('on')">Craigslist</div>
       </div>
     </div>
 
-    <div>
-      <div class="section-label">Bathrooms</div>
-      <div class="field">
-        <label for="minBaths">Min bathrooms</label>
-        <input type="number" id="minBaths" min="0" max="10" step="0.5" value="1" placeholder="1" />
+    <div id="setup-error"></div>
+
+    <button class="cta" id="startBtn" onclick="startSearch()">Search apartments →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     SCREEN 2 — Swipe
+════════════════════════════ -->
+<div class="screen" id="s-swipe">
+  <div class="top-bar">
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+    <div class="top-count" id="swipe-count"></div>
+  </div>
+  <div class="swipe-area" id="swipe-area">
+    <div class="empty-state">
+      <div class="spinner"></div>
+      <div style="color:var(--text2);">Loading listings…</div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nav-item on"   id="nav-discover"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+    <div class="nav-item"      onclick="goTo('s-saved')"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item"      onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     SCREEN 3 — Saved
+════════════════════════════ -->
+<div class="screen" id="s-saved">
+  <div class="top-bar">
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+  </div>
+  <div class="saved-hdr">
+    <div class="sec-title">Saved apartments</div>
+    <div class="sec-sub" id="saved-sub">0 places you liked</div>
+  </div>
+  <div class="saved-list" id="saved-list"></div>
+  <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
+  <div class="nav">
+    <div class="nav-item"   onclick="goTo('s-swipe')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+    <div class="nav-item on"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item"   onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     SCREEN 4 — Profile
+════════════════════════════ -->
+<div class="screen" id="s-profile">
+  <div class="top-bar">
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+  </div>
+  <div class="prof-wrap">
+    <div class="ava-row">
+      <div class="ava">🏠</div>
+      <div>
+        <div class="pname">Chicago Apartment Hunt</div>
+        <div class="psub" id="prof-status">Active search</div>
       </div>
     </div>
 
-    <div>
-      <div class="section-label">Monthly Rent</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="minRent">Min ($)</label>
-          <input type="number" id="minRent" min="0" value="0" placeholder="0" />
-        </div>
-        <div class="field">
-          <label for="maxRent">Max ($)</label>
-          <input type="number" id="maxRent" min="0" value="3000" placeholder="3000" />
-        </div>
-      </div>
+    <div class="pcard">
+      <div class="pchead">Search criteria</div>
+      <div class="prow"><span class="pkey">Max rent</span><span class="pval" id="prof-rent">—</span></div>
+      <div class="prow"><span class="pkey">Beds / Baths</span><span class="pval" id="prof-beds">—</span></div>
+      <div class="prow"><span class="pkey">Sources</span><span class="pval" id="prof-sources">—</span></div>
     </div>
 
-  </aside>
+    <div class="pcard">
+      <div class="pchead">Activity</div>
+      <div class="prow"><span class="pkey">Listings viewed</span><span class="pval" id="prof-viewed">0</span></div>
+      <div class="prow"><span class="pkey">Saved</span><span class="pval" id="prof-saved-count">0</span></div>
+      <div class="prow"><span class="pkey">Passed</span><span class="pval" id="prof-passed">0</span></div>
+    </div>
 
-  <!-- ── Results ── -->
-  <main>
-    <div class="status-bar" id="statusBar">Configure filters and click Search.</div>
-    <div id="results"></div>
-  </main>
-
+    <button class="cta-ghost" onclick="goTo('s-setup')">Edit search criteria</button>
+    <button class="cta" onclick="newSearch()">New search</button>
+  </div>
+  <div class="nav">
+    <div class="nav-item" onclick="goTo('s-swipe')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+    <div class="nav-item" onclick="goTo('s-saved')"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item on"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+  </div>
 </div>
 
 <script>
-  const searchBtn  = document.getElementById("searchBtn");
-  const statusBar  = document.getElementById("statusBar");
-  const resultsDiv = document.getElementById("results");
+// ══════════════════════════════════════
+//  State
+// ══════════════════════════════════════
+let listings    = [];
+let currentIdx  = 0;
+let prefs       = JSON.parse(localStorage.getItem('abode_prefs') || 'null');
+let stats       = JSON.parse(localStorage.getItem('abode_stats') || '{"viewed":0,"passed":0}');
 
-  searchBtn.addEventListener("click", runSearch);
+// Saved listings are persisted server-side; we also cache locally.
+let savedListings = [];
 
-  async function runSearch() {
-    const sources = Array.from(
-      document.querySelectorAll(".source-list input:checked")
-    ).map(el => el.value);
+// ══════════════════════════════════════
+//  Navigation
+// ══════════════════════════════════════
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 's-saved')   { loadSaved(); }
+  if (id === 's-profile') { renderProfile(); }
+}
 
-    if (sources.length === 0) {
-      statusBar.textContent = "Select at least one source.";
+// ══════════════════════════════════════
+//  Search
+// ══════════════════════════════════════
+async function startSearch() {
+  const maxRent  = parseInt(document.getElementById('pref-maxRent').value) || 0;
+  const bedrooms = parseInt(document.getElementById('pref-beds').value);
+  const minBaths = parseInt(document.getElementById('pref-baths').value);
+  const sources  = Array.from(document.querySelectorAll('#source-pills .pill.on')).map(p => p.dataset.val);
+
+  const errEl = document.getElementById('setup-error');
+  if (!maxRent || sources.length === 0) {
+    errEl.innerHTML = '<div class="error-toast">Please enter a max rent and select at least one source.</div>';
+    return;
+  }
+  errEl.innerHTML = '';
+
+  prefs = { maxRent, bedrooms, minBaths, sources };
+  localStorage.setItem('abode_prefs', JSON.stringify(prefs));
+
+  const btn = document.getElementById('startBtn');
+  btn.disabled = true;
+  btn.textContent = 'Searching…';
+
+  // Navigate to swipe screen immediately; show spinner
+  goTo('s-swipe');
+  showSwipeLoading();
+
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sources, bedrooms, minBaths, maxRent }),
+    });
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+
+    listings   = Object.values(data.results || {}).flat();
+    currentIdx = 0;
+
+    if (listings.length === 0) {
+      showSwipeEmpty('No listings found — try adjusting your filters.');
       return;
     }
-
-    const minBeds  = parseInt(document.getElementById("minBeds").value)  || 1;
-    const maxBeds  = parseInt(document.getElementById("maxBeds").value)  || minBeds;
-    const minBaths = parseFloat(document.getElementById("minBaths").value) || 1;
-    const minRent  = parseInt(document.getElementById("minRent").value)  || 0;
-    const maxRent  = parseInt(document.getElementById("maxRent").value)  || 3000;
-
-    searchBtn.disabled = true;
-    statusBar.innerHTML = `<span class="spinner"></span>Scraping ${sources.join(", ")}…`;
-    resultsDiv.innerHTML = "";
-
-    try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources, bedrooms: minBeds, maxBedrooms: maxBeds, minBaths, minRent, maxRent }),
-      });
-
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const data = await res.json();
-
-      statusBar.textContent = `Found ${data.total} listing${data.total !== 1 ? "s" : ""} across ${sources.length} source${sources.length !== 1 ? "s" : ""}.`;
-      renderResults(data.results);
-    } catch (err) {
-      statusBar.textContent = "";
-      resultsDiv.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
-    } finally {
-      searchBtn.disabled = false;
-    }
+    renderCard();
+  } catch (e) {
+    showSwipeEmpty(`Error: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search apartments →';
   }
+}
 
-  const SOURCE_ORDER = ["Zillow", "Redfin", "Craigslist"];
+function newSearch() {
+  listings   = [];
+  currentIdx = 0;
+  goTo('s-setup');
+}
 
-  function renderResults(results) {
-    const entries = Object.entries(results)
-      .sort(([a], [b]) => {
-        const ai = SOURCE_ORDER.indexOf(a);
-        const bi = SOURCE_ORDER.indexOf(b);
-        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-      });
-    if (entries.every(([, listings]) => listings.length === 0)) {
-      resultsDiv.innerHTML = `<div class="empty">No listings found. Try adjusting your filters.</div>`;
-      return;
-    }
+// ══════════════════════════════════════
+//  Swipe screen helpers
+// ══════════════════════════════════════
+function showSwipeLoading() {
+  document.getElementById('swipe-area').innerHTML = `
+    <div class="empty-state">
+      <div class="spinner"></div>
+      <div style="color:var(--text2);margin-top:6px;">Scraping listings…</div>
+      <div style="color:var(--text3);font-size:12px;">This can take 15–30 seconds</div>
+    </div>`;
+  document.getElementById('swipe-count').textContent = '';
+}
 
-    resultsDiv.innerHTML = entries.map(([source, listings]) => {
-      if (listings.length === 0) return "";
-      return `
-        <div class="source-section">
-          <h2>${source} <span class="count-badge">${listings.length}</span></h2>
-          <div class="cards">
-            ${listings.map(card).join("")}
-          </div>
-        </div>`;
-    }).join("");
-  }
+function showSwipeEmpty(msg) {
+  document.getElementById('swipe-area').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div style="color:var(--text2);">${esc(msg)}</div>
+      <button class="cta" style="max-width:220px;margin-top:12px;" onclick="goTo('s-setup')">← Back to search</button>
+    </div>`;
+  document.getElementById('swipe-count').textContent = '';
+}
 
-  function card(l) {
-    const meta = [
-      l.beds  ? `🛏 ${l.beds} bed`  : "",
-      l.baths ? `🚿 ${l.baths} bath` : "",
-      l.sqft  ? `📐 ${l.sqft} sqft`  : "",
-    ].filter(Boolean);
+function renderCard() {
+  const area      = document.getElementById('swipe-area');
+  const countEl   = document.getElementById('swipe-count');
+  const remaining = listings.length - currentIdx;
 
-    return `
-      <div class="card">
-        <div class="card-title">${esc(l.title) || esc(l.location) || "Untitled listing"}</div>
-        <div class="card-price">${esc(l.price) || "—"}</div>
-        <div class="card-location">📍 ${esc(l.location) || "Chicago, IL"}</div>
-        ${meta.length ? `<div class="card-meta">${meta.map(m => `<span>${m}</span>`).join("")}</div>` : ""}
-        ${l.url ? `<a class="card-link" href="${esc(l.url)}" target="_blank" rel="noopener">View listing →</a>` : ""}
+  if (currentIdx >= listings.length) {
+    countEl.textContent = '';
+    area.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✓</div>
+        <div style="font-size:16px;color:var(--text2);">You've seen all listings</div>
+        <div style="color:var(--text3);font-size:13px;">${listings.length} total · ${savedListings.length} saved</div>
+        <button class="cta" style="max-width:220px;margin-top:12px;" onclick="goTo('s-setup')">Search again</button>
       </div>`;
+    return;
   }
 
-  function esc(str) {
-    return String(str ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  countEl.textContent = `${remaining} remaining`;
+  const l = listings[currentIdx];
+
+  area.innerHTML = `
+    <div class="hint">
+      <span class="pass-hint">✕  pass</span>
+      <span class="save-hint">save  ♡</span>
+    </div>
+    <div class="apt-card" id="apt-card" style="position:relative;">
+      <div class="swipe-ov" id="swipe-ov"></div>
+      <div class="apt-photo">
+        🏢
+        ${l.image ? `<img src="${esc(l.image)}" alt="listing photo" onerror="this.style.display='none'">` : ''}
+        <div class="photo-overlay"></div>
+        <div class="badge-avail">New listing</div>
+        <div class="badge-source">${esc(l.source || '')}</div>
+      </div>
+      <div class="apt-body">
+        <div class="apt-price">${esc(l.price) || '—'}</div>
+        <div class="apt-addr">${buildAddr(l)}</div>
+        <div class="apt-tags">${buildTags(l)}</div>
+      </div>
+    </div>
+    <div class="btns">
+      <div class="btn-swipe btn-pass" onclick="doSwipe('pass')" title="Pass">✕</div>
+      <div class="btn-swipe btn-info" onclick="openListing()"   title="Open listing">↗</div>
+      <div class="btn-swipe btn-save" onclick="doSwipe('save')" title="Save">♡</div>
+    </div>`;
+}
+
+function buildAddr(l) {
+  const parts = [];
+  if (l.beds)     parts.push(`${l.beds} bd`);
+  if (l.baths)    parts.push(`${l.baths} ba`);
+  if (l.sqft)     parts.push(`${l.sqft} sqft`);
+  if (l.location) parts.push(l.location);
+  return esc(parts.join(' · ') || l.title || '');
+}
+
+function buildTags(l) {
+  // Surface any known amenity signals from the listing title / source
+  const tags = [];
+  const text  = ((l.title || '') + ' ' + (l.location || '')).toLowerCase();
+  if (/laundry|washer/i.test(text))      tags.push('Laundry');
+  if (/parking|garage/i.test(text))      tags.push('Parking');
+  if (/pet|dog|cat/i.test(text))         tags.push('Pet friendly');
+  if (/dishwasher/i.test(text))          tags.push('Dishwasher');
+  if (/hardwood/i.test(text))            tags.push('Hardwood');
+  if (/roof|deck/i.test(text))           tags.push('Roof deck');
+  // Always show source as a tag
+  if (l.source && tags.length === 0)     tags.push(l.source);
+  return tags.slice(0, 4).map(t => `<div class="apt-tag">${esc(t)}</div>`).join('');
+}
+
+function openListing() {
+  const l = listings[currentIdx];
+  if (l?.url) window.open(l.url, '_blank', 'noopener');
+}
+
+// ══════════════════════════════════════
+//  Swiping
+// ══════════════════════════════════════
+function doSwipe(dir) {
+  const card = document.getElementById('apt-card');
+  const ov   = document.getElementById('swipe-ov');
+  if (!card) return;
+
+  const l = listings[currentIdx];
+
+  ov.textContent  = dir === 'save' ? '♡' : '✕';
+  ov.style.color  = dir === 'save' ? '#1D9E75' : '#c94444';
+  ov.style.opacity = 1;
+
+  card.style.transform = dir === 'save'
+    ? 'translateX(90px) rotate(9deg)'
+    : 'translateX(-90px) rotate(-9deg)';
+  card.style.opacity = '0.15';
+
+  // Update stats
+  stats.viewed++;
+  if (dir === 'pass') stats.passed++;
+  localStorage.setItem('abode_stats', JSON.stringify(stats));
+
+  if (dir === 'save') saveListing(l);
+
+  setTimeout(() => {
+    currentIdx++;
+    renderCard();
+  }, 300);
+}
+
+// ══════════════════════════════════════
+//  Save / Unsave
+// ══════════════════════════════════════
+function listingKey(l) {
+  return (l.url || l.title || '').toLowerCase().trim();
+}
+
+async function saveListing(l) {
+  const key = listingKey(l);
+  if (savedListings.some(s => listingKey(s) === key)) return; // already saved
+
+  savedListings.push(l);
+
+  try {
+    await fetch('/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(l),
+    });
+  } catch (_) { /* silent — still cached locally */ }
+}
+
+async function unsaveListing(key) {
+  savedListings = savedListings.filter(s => listingKey(s) !== key);
+
+  try {
+    await fetch('/api/save', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+  } catch (_) { /* silent */ }
+
+  renderSaved();
+  renderProfile();
+}
+
+async function loadSaved() {
+  try {
+    const res  = await fetch('/api/saved');
+    const data = await res.json();
+    savedListings = data.listings || [];
+  } catch (_) {
+    // Fall back to local cache
   }
+  renderSaved();
+}
+
+// ══════════════════════════════════════
+//  Saved screen
+// ══════════════════════════════════════
+function renderSaved() {
+  const list  = document.getElementById('saved-list');
+  const sub   = document.getElementById('saved-sub');
+  const count = savedListings.length;
+
+  sub.textContent = `${count} place${count !== 1 ? 's' : ''} you liked`;
+
+  // Clear button
+  const clearWrap = document.getElementById('saved-clear-wrap');
+  clearWrap.innerHTML = count > 0
+    ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>`
+    : '';
+
+  if (count === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">♡</div>
+        <div style="color:var(--text2);">No saved apartments yet</div>
+        <div style="color:var(--text3);font-size:13px;">Tap ♡ while swiping to save listings you like</div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = savedListings.map(l => {
+    const key     = listingKey(l).replace(/'/g, "\\'");
+    const addrStr = buildAddr(l);
+    return `
+      <div class="saved-card">
+        <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="listing photo" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
+        <div class="saved-body">
+          <div class="saved-price">${esc(l.price) || '—'}</div>
+          <div class="saved-addr">${addrStr}</div>
+          <div class="saved-tags">
+            ${l.beds   ? `<div class="saved-tag">${l.beds}bd</div>`   : ''}
+            ${l.baths  ? `<div class="saved-tag">${l.baths}ba</div>`  : ''}
+            ${l.sqft   ? `<div class="saved-tag">${l.sqft}sqft</div>` : ''}
+            ${l.source ? `<div class="saved-tag">${esc(l.source)}</div>` : ''}
+          </div>
+        </div>
+        <div class="saved-actions">
+          ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
+          <button class="saved-btn remove" onclick="unsaveListing('${key}')">Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function clearAllSaved() {
+  if (!confirm('Remove all saved apartments?')) return;
+  savedListings = [];
+  try { await fetch('/api/save/clear', { method: 'POST' }); } catch (_) {}
+  renderSaved();
+  renderProfile();
+}
+
+// ══════════════════════════════════════
+//  Profile screen
+// ══════════════════════════════════════
+function renderProfile() {
+  if (prefs) {
+    document.getElementById('prof-rent').textContent    = `$${Number(prefs.maxRent).toLocaleString()}/mo`;
+    document.getElementById('prof-beds').textContent    = `${prefs.bedrooms}bd · ${prefs.minBaths}ba`;
+    document.getElementById('prof-sources').textContent = prefs.sources.join(', ');
+  }
+  document.getElementById('prof-viewed').textContent      = stats.viewed;
+  document.getElementById('prof-saved-count').textContent = savedListings.length;
+  document.getElementById('prof-passed').textContent      = stats.passed;
+  document.getElementById('prof-status').textContent      =
+    listings.length > 0 ? `${listings.length} listings loaded` : 'No active search';
+}
+
+// ══════════════════════════════════════
+//  Utilities
+// ══════════════════════════════════════
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ══════════════════════════════════════
+//  Init — restore saved prefs on load
+// ══════════════════════════════════════
+(function init() {
+  if (prefs) {
+    document.getElementById('pref-maxRent').value = prefs.maxRent;
+    document.getElementById('pref-beds').value    = prefs.bedrooms;
+    document.getElementById('pref-baths').value   = prefs.minBaths;
+    document.querySelectorAll('#source-pills .pill').forEach(p => {
+      p.classList.toggle('on', prefs.sources.includes(p.dataset.val));
+    });
+  }
+})();
 </script>
-
 </body>
 </html>

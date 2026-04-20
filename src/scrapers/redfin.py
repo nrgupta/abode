@@ -47,6 +47,7 @@ async def scrape_redfin(filters: dict) -> list[dict]:
                     const bedsMatch = stats.match(/(\\d+)\\s*bed/i);
                     const bathsMatch = stats.match(/([\\d.]+)\\s*bath/i);
                     const sqftMatch = stats.match(/([\\d,]+)\\s*sq\\s*ft/i);
+                    const img = el.querySelector('img')?.src || '';
                     return {
                         title: address.split('\\n')[0].trim() || address,
                         price,
@@ -55,6 +56,7 @@ async def scrape_redfin(filters: dict) -> list[dict]:
                         beds: bedsMatch ? bedsMatch[1] : '',
                         baths: bathsMatch ? bathsMatch[1] : '',
                         sqft: sqftMatch ? sqftMatch[1] : '',
+                        image: img,
                         source: 'Redfin',
                         scrapedAt: new Date().toISOString(),
                         _debug_stats: stats,
