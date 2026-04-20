@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 
+import psycopg2
+import psycopg2.extras
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -12,30 +14,66 @@ from agent.listingsTool import run_agent
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "public"))
 
-PORT       = int(os.environ.get("PORT", 3000))
-SAVED_FILE = Path(__file__).parent / "saved_listings.json"
+PORT        = int(os.environ.get("PORT", 3000))
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
-# ── Saved listings helpers ──────────────────────────────────────────────────
+# ── Database helpers ─────────────────────────────────────────────────────────
 
-def load_saved() -> list[dict]:
-    if SAVED_FILE.exists():
-        try:
-            return json.loads(SAVED_FILE.read_text())
-        except Exception:
-            return []
-    return []
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
 
-def write_saved(listings: list[dict]) -> None:
-    SAVED_FILE.write_text(json.dumps(listings, indent=2))
+def init_db():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS saved_listings (
+                    key  TEXT PRIMARY KEY,
+                    data JSONB NOT NULL
+                )
+            """)
+        conn.commit()
 
 
 def listing_key(l: dict) -> str:
     return (l.get("url") or l.get("title") or "").lower().strip()
 
 
-# ── Routes ──────────────────────────────────────────────────────────────────
+def load_saved() -> list[dict]:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT data FROM saved_listings ORDER BY data->>'title'")
+            return [row["data"] for row in cur.fetchall()]
+
+
+def save_one(listing: dict) -> None:
+    key = listing_key(listing)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO saved_listings (key, data)
+                VALUES (%s, %s)
+                ON CONFLICT (key) DO NOTHING
+            """, (key, json.dumps(listing)))
+        conn.commit()
+
+
+def delete_one(key: str) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM saved_listings WHERE key = %s", (key,))
+        conn.commit()
+
+
+def clear_all() -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM saved_listings")
+        conn.commit()
+
+
+# ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -86,14 +124,8 @@ def save_listing():
     if not listing:
         return jsonify({"error": "No listing provided"}), 400
 
-    saved = load_saved()
-    key   = listing_key(listing)
-
-    if not any(listing_key(s) == key for s in saved):
-        saved.append(listing)
-        write_saved(saved)
-
-    return jsonify({"ok": True, "count": len(saved)})
+    save_one(listing)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/save", methods=["DELETE"])
@@ -104,21 +136,25 @@ def unsave_listing():
     if not key:
         return jsonify({"error": "key required"}), 400
 
-    saved   = load_saved()
-    updated = [s for s in saved if listing_key(s) != key]
-    write_saved(updated)
-
-    return jsonify({"ok": True, "count": len(updated)})
+    delete_one(key)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/save/clear", methods=["POST"])
 def clear_saved():
-    write_saved([])
+    clear_all()
     return jsonify({"ok": True})
 
 
-# ── Entry point ─────────────────────────────────────────────────────────────
+# ── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    if DATABASE_URL:
+        init_db()
     print(f"Abode UI → http://localhost:{PORT}")
     app.run(host="0.0.0.0", port=PORT)
+
+
+# Called by gunicorn — init DB on startup
+if DATABASE_URL:
+    init_db()
