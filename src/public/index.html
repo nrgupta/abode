@@ -148,6 +148,7 @@
       cursor: pointer;
       padding: 4px;
     }
+    .small-link span { color: var(--green-light); text-decoration: underline; }
 
     /* ── Bottom nav ── */
     .nav {
@@ -172,6 +173,26 @@
     .nav-lbl  { font-size: 10px; color: var(--text3); letter-spacing: 0.3px; transition: color 0.15s; }
     .nav-item.on .nav-icon,
     .nav-item.on .nav-lbl { color: var(--green); }
+
+    /* ─────────────────────────────
+       AUTH SCREENS
+    ───────────────────────────── */
+    #s-login .content,
+    #s-signup .content {
+      justify-content: center;
+      max-width: 420px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .auth-logo-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--green); }
+    .auth-logo-text { font-size: 26px; font-weight: 500; letter-spacing: -0.5px; }
 
     /* ─────────────────────────────
        SETUP SCREEN
@@ -483,9 +504,71 @@
 <body>
 
 <!-- ════════════════════════════
+     SCREEN 0a — Login
+════════════════════════════ -->
+<div class="screen" id="s-login">
+  <div class="content">
+    <div style="margin-bottom: 8px;">
+      <div class="auth-logo">
+        <div class="auth-logo-dot"></div>
+        <span class="auth-logo-text">Abode</span>
+      </div>
+      <div class="sec-sub">Sign in to find your next home</div>
+    </div>
+
+    <div>
+      <div class="label">Email</div>
+      <input class="inp" type="email" id="login-email" placeholder="you@example.com" autocomplete="email" />
+    </div>
+
+    <div>
+      <div class="label">Password</div>
+      <input class="inp" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+
+    <div id="login-error"></div>
+
+    <button class="cta" id="loginBtn" onclick="doLogin()">Sign in →</button>
+
+    <div class="small-link">Don't have an account? <span onclick="goTo('s-signup')">Sign up</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     SCREEN 0b — Sign Up
+════════════════════════════ -->
+<div class="screen" id="s-signup">
+  <div class="content">
+    <div style="margin-bottom: 8px;">
+      <div class="auth-logo">
+        <div class="auth-logo-dot"></div>
+        <span class="auth-logo-text">Abode</span>
+      </div>
+      <div class="sec-sub">Create an account to start swiping</div>
+    </div>
+
+    <div>
+      <div class="label">Email</div>
+      <input class="inp" type="email" id="signup-email" placeholder="you@example.com" autocomplete="email" />
+    </div>
+
+    <div>
+      <div class="label">Password</div>
+      <input class="inp" type="password" id="signup-password" placeholder="Min. 6 characters" autocomplete="new-password" />
+    </div>
+
+    <div id="signup-error"></div>
+
+    <button class="cta" id="signupBtn" onclick="doSignup()">Create account →</button>
+
+    <div class="small-link">Already have an account? <span onclick="goTo('s-login')">Sign in</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
      SCREEN 1 — Setup
 ════════════════════════════ -->
-<div class="screen active" id="s-setup">
+<div class="screen" id="s-setup">
   <div class="top-bar">
     <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
   </div>
@@ -584,7 +667,7 @@
     <div class="ava-row">
       <div class="ava">🏠</div>
       <div>
-        <div class="pname">Chicago Apartment Hunt</div>
+        <div class="pname" id="prof-email">—</div>
         <div class="psub" id="prof-status">Active search</div>
       </div>
     </div>
@@ -605,6 +688,7 @@
 
     <button class="cta-ghost" onclick="goTo('s-setup')">Edit search criteria</button>
     <button class="cta" onclick="newSearch()">New search</button>
+    <button class="cta-ghost" style="border-color:rgba(201,68,68,0.3);color:var(--red);" onclick="doLogout()">Sign out</button>
   </div>
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-swipe')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
@@ -621,6 +705,7 @@ let listings    = [];
 let currentIdx  = 0;
 let prefs       = JSON.parse(localStorage.getItem('abode_prefs') || 'null');
 let stats       = JSON.parse(localStorage.getItem('abode_stats') || '{"viewed":0,"passed":0}');
+let currentUser = null;  // { email } when logged in
 
 // Saved listings are persisted server-side; we also cache locally.
 let savedListings = [];
@@ -633,6 +718,102 @@ function goTo(id) {
   document.getElementById(id).classList.add('active');
   if (id === 's-saved')   { loadSaved(); }
   if (id === 's-profile') { renderProfile(); }
+}
+
+// ══════════════════════════════════════
+//  Auth
+// ══════════════════════════════════════
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl    = document.getElementById('login-error');
+  const btn      = document.getElementById('loginBtn');
+
+  errEl.innerHTML = '';
+  if (!email || !password) {
+    errEl.innerHTML = '<div class="error-toast">Email and password are required.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const res  = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.innerHTML = `<div class="error-toast">${esc(data.error || 'Login failed')}</div>`;
+      return;
+    }
+    currentUser = { email: data.email };
+    document.getElementById('login-password').value = '';
+    enterApp();
+  } catch (e) {
+    errEl.innerHTML = '<div class="error-toast">Network error — please try again.</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in →';
+  }
+}
+
+async function doSignup() {
+  const email    = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const errEl    = document.getElementById('signup-error');
+  const btn      = document.getElementById('signupBtn');
+
+  errEl.innerHTML = '';
+  if (!email || !password) {
+    errEl.innerHTML = '<div class="error-toast">Email and password are required.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+
+  try {
+    const res  = await fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.innerHTML = `<div class="error-toast">${esc(data.error || 'Signup failed')}</div>`;
+      return;
+    }
+    currentUser = { email: data.email };
+    document.getElementById('signup-password').value = '';
+    enterApp();
+  } catch (e) {
+    errEl.innerHTML = '<div class="error-toast">Network error — please try again.</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create account →';
+  }
+}
+
+async function doLogout() {
+  await fetch('/api/logout', { method: 'POST' });
+  currentUser   = null;
+  savedListings = [];
+  listings      = [];
+  currentIdx    = 0;
+  goTo('s-login');
+}
+
+function enterApp() {
+  // Go to setup or directly to swipe if we have a previous session
+  if (prefs) {
+    restorePrefs();
+    goTo('s-setup');
+  } else {
+    goTo('s-setup');
+  }
 }
 
 // ══════════════════════════════════════
@@ -668,6 +849,7 @@ async function startSearch() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sources, bedrooms, minBaths, maxRent }),
     });
+    if (res.status === 401) { goTo('s-login'); return; }
     if (!res.ok) throw new Error(`Server error ${res.status}`);
     const data = await res.json();
 
@@ -864,6 +1046,7 @@ async function unsaveListing(key) {
 async function loadSaved() {
   try {
     const res  = await fetch('/api/saved');
+    if (res.status === 401) { goTo('s-login'); return; }
     const data = await res.json();
     savedListings = data.listings || [];
   } catch (_) {
@@ -934,6 +1117,7 @@ async function clearAllSaved() {
 //  Profile screen
 // ══════════════════════════════════════
 function renderProfile() {
+  document.getElementById('prof-email').textContent = currentUser?.email || '—';
   if (prefs) {
     document.getElementById('prof-rent').textContent    = `$${Number(prefs.maxRent).toLocaleString()}/mo`;
     document.getElementById('prof-beds').textContent    = `${prefs.bedrooms}bd · ${prefs.minBaths}ba`;
@@ -958,17 +1142,33 @@ function esc(str) {
     .replace(/'/g, '&#39;');
 }
 
+function restorePrefs() {
+  if (!prefs) return;
+  document.getElementById('pref-maxRent').value = prefs.maxRent;
+  document.getElementById('pref-beds').value    = prefs.bedrooms;
+  document.getElementById('pref-baths').value   = prefs.minBaths;
+  document.querySelectorAll('#source-pills .pill').forEach(p => {
+    p.classList.toggle('on', prefs.sources.includes(p.dataset.val));
+  });
+}
+
 // ══════════════════════════════════════
-//  Init — restore saved prefs on load
+//  Init — check session on load
 // ══════════════════════════════════════
-(function init() {
-  if (prefs) {
-    document.getElementById('pref-maxRent').value = prefs.maxRent;
-    document.getElementById('pref-beds').value    = prefs.bedrooms;
-    document.getElementById('pref-baths').value   = prefs.minBaths;
-    document.querySelectorAll('#source-pills .pill').forEach(p => {
-      p.classList.toggle('on', prefs.sources.includes(p.dataset.val));
-    });
+(async function init() {
+  restorePrefs();
+
+  try {
+    const res  = await fetch('/api/me');
+    const data = await res.json();
+    if (data.authenticated) {
+      currentUser = { email: data.email };
+      goTo('s-setup');
+    } else {
+      goTo('s-login');
+    }
+  } catch (_) {
+    goTo('s-login');
   }
 })();
 </script>

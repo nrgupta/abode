@@ -2,13 +2,15 @@ import asyncio
 import hashlib
 import json
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
+import bcrypt
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 
 load_dotenv()
 
@@ -18,6 +20,9 @@ app = Flask(__name__, static_folder=str(Path(__file__).parent / "public"))
 
 PORT         = int(os.environ.get("PORT", 3000))
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Secret key for signing session cookies — set SESSION_SECRET in env for production
+app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 
 # How long (in seconds) cached search results are considered fresh (default: 4 hours)
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", 4 * 60 * 60))
@@ -33,9 +38,19 @@ def init_db():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id            SERIAL PRIMARY KEY,
+                    email         TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS saved_listings (
-                    key  TEXT PRIMARY KEY,
-                    data JSONB NOT NULL
+                    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    key      TEXT NOT NULL,
+                    data     JSONB NOT NULL,
+                    PRIMARY KEY (user_id, key)
                 )
             """)
             cur.execute("""
@@ -45,6 +60,87 @@ def init_db():
                     cached_at   TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
             """)
+        conn.commit()
+
+
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+
+def current_user_id() -> int | None:
+    return session.get("user_id")
+
+
+def require_auth():
+    """Return (user_id, None) or (None, error_response)."""
+    uid = current_user_id()
+    if not uid:
+        return None, (jsonify({"error": "Not authenticated"}), 401)
+    return uid, None
+
+
+# ── User DB helpers ───────────────────────────────────────────────────────────
+
+def get_user_by_email(email: str) -> dict | None:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users WHERE email = %s", (email.lower().strip(),))
+            return cur.fetchone()
+
+
+def create_user(email: str, password: str) -> dict:
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING *",
+                (email.lower().strip(), hashed),
+            )
+            user = cur.fetchone()
+        conn.commit()
+    return user
+
+
+# ── Saved listings helpers ────────────────────────────────────────────────────
+
+def listing_key(l: dict) -> str:
+    return (l.get("url") or l.get("title") or "").lower().strip()
+
+
+def load_saved(user_id: int) -> list[dict]:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT data FROM saved_listings WHERE user_id = %s ORDER BY data->>'title'",
+                (user_id,),
+            )
+            return [row["data"] for row in cur.fetchall()]
+
+
+def save_one(user_id: int, listing: dict) -> None:
+    key = listing_key(listing)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO saved_listings (user_id, key, data)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id, key) DO NOTHING
+            """, (user_id, key, json.dumps(listing)))
+        conn.commit()
+
+
+def delete_one(user_id: int, key: str) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM saved_listings WHERE user_id = %s AND key = %s",
+                (user_id, key),
+            )
+        conn.commit()
+
+
+def clear_all(user_id: int) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM saved_listings WHERE user_id = %s", (user_id,))
         conn.commit()
 
 
@@ -104,41 +200,63 @@ def cache_clear() -> None:
         conn.commit()
 
 
-def listing_key(l: dict) -> str:
-    return (l.get("url") or l.get("title") or "").lower().strip()
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.route("/api/signup", methods=["POST"])
+def signup():
+    data     = request.get_json(force=True) or {}
+    email    = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    if get_user_by_email(email):
+        return jsonify({"error": "An account with that email already exists"}), 409
+
+    user = create_user(email, password)
+    session["user_id"] = user["id"]
+    return jsonify({"ok": True, "email": user["email"]})
 
 
-def load_saved() -> list[dict]:
+@app.route("/api/login", methods=["POST"])
+def login():
+    data     = request.get_json(force=True) or {}
+    email    = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+
+    user = get_user_by_email(email)
+    if not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    session["user_id"] = user["id"]
+    return jsonify({"ok": True, "email": user["email"]})
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/me", methods=["GET"])
+def me():
+    uid = current_user_id()
+    if not uid:
+        return jsonify({"authenticated": False})
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT data FROM saved_listings ORDER BY data->>'title'")
-            return [row["data"] for row in cur.fetchall()]
-
-
-def save_one(listing: dict) -> None:
-    key = listing_key(listing)
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO saved_listings (key, data)
-                VALUES (%s, %s)
-                ON CONFLICT (key) DO NOTHING
-            """, (key, json.dumps(listing)))
-        conn.commit()
-
-
-def delete_one(key: str) -> None:
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM saved_listings WHERE key = %s", (key,))
-        conn.commit()
-
-
-def clear_all() -> None:
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM saved_listings")
-        conn.commit()
+            cur.execute("SELECT email FROM users WHERE id = %s", (uid,))
+            row = cur.fetchone()
+    if not row:
+        session.clear()
+        return jsonify({"authenticated": False})
+    return jsonify({"authenticated": True, "email": row["email"]})
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -150,6 +268,10 @@ def index():
 
 @app.route("/api/search", methods=["POST"])
 def search():
+    uid, err = require_auth()
+    if err:
+        return err
+
     data = request.get_json(force=True) or {}
 
     sources   = ["zillow"]
@@ -194,34 +316,43 @@ def search():
 
 @app.route("/api/saved", methods=["GET"])
 def get_saved():
-    return jsonify({"listings": load_saved()})
+    uid, err = require_auth()
+    if err:
+        return err
+    return jsonify({"listings": load_saved(uid)})
 
 
 @app.route("/api/save", methods=["POST"])
 def save_listing():
+    uid, err = require_auth()
+    if err:
+        return err
     listing = request.get_json(force=True)
     if not listing:
         return jsonify({"error": "No listing provided"}), 400
-
-    save_one(listing)
+    save_one(uid, listing)
     return jsonify({"ok": True})
 
 
 @app.route("/api/save", methods=["DELETE"])
 def unsave_listing():
+    uid, err = require_auth()
+    if err:
+        return err
     data = request.get_json(force=True) or {}
     key  = (data.get("key") or "").lower().strip()
-
     if not key:
         return jsonify({"error": "key required"}), 400
-
-    delete_one(key)
+    delete_one(uid, key)
     return jsonify({"ok": True})
 
 
 @app.route("/api/save/clear", methods=["POST"])
 def clear_saved():
-    clear_all()
+    uid, err = require_auth()
+    if err:
+        return err
+    clear_all(uid)
     return jsonify({"ok": True})
 
 
