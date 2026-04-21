@@ -339,8 +339,26 @@
     }
 
     /* ── Saved screen ── */
-    .saved-hdr { padding: 4px 24px 12px; flex-shrink: 0; }
-    .saved-list { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
+    .saved-hdr { padding: 4px 24px 8px; flex-shrink: 0; }
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      padding: 0 20px 10px;
+      flex-shrink: 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      font-size: 13px;
+      color: var(--text3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab.on { color: var(--green); border-bottom-color: var(--green); font-weight: 500; }
+    .saved-list { padding: 12px 20px 0; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
     .saved-card {
       display: flex; border-radius: 14px; overflow: hidden;
       border: 0.5px solid var(--border2); background: var(--bg2);
@@ -574,8 +592,12 @@
     <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
   </div>
   <div class="saved-hdr">
-    <div class="sec-title">Saved apartments</div>
+    <div class="sec-title" id="saved-title">Saved apartments</div>
     <div class="sec-sub" id="saved-sub">0 places you liked</div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab on" id="tab-saved" onclick="switchTab('saved')">Saved</div>
+    <div class="tab"    id="tab-passed" onclick="switchTab('passed')">Passed</div>
   </div>
   <div class="saved-list" id="saved-list"></div>
   <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
@@ -590,12 +612,14 @@
 // ══════════════════════════════════════
 //  State
 // ══════════════════════════════════════
-let listings    = [];
-let currentIdx  = 0;
-let prefs       = JSON.parse(localStorage.getItem('abode_prefs') || 'null');
-let stats       = JSON.parse(localStorage.getItem('abode_stats') || '{"viewed":0,"passed":0}');
-let currentUser = null;
+let listings      = [];
+let currentIdx    = 0;
+let prefs         = JSON.parse(localStorage.getItem('abode_prefs') || 'null');
+let stats         = JSON.parse(localStorage.getItem('abode_stats') || '{"viewed":0,"passed":0}');
+let currentUser   = null;
 let savedListings = [];
+let passedKeys    = [];   // just keys — we don't store full passed listing data
+let activeTab     = 'saved';
 // Keys of listings the user has already acted on (saved or passed) this session
 let seenKeys = new Set(JSON.parse(localStorage.getItem('abode_seen') || '[]'));
 
@@ -605,8 +629,15 @@ let seenKeys = new Set(JSON.parse(localStorage.getItem('abode_seen') || '[]'));
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 's-saved')   { loadSaved(); }
+  if (id === 's-saved')   { activeTab = 'saved'; document.getElementById('tab-saved').classList.add('on'); document.getElementById('tab-passed').classList.remove('on'); loadSaved(); }
   if (id === 's-profile') { renderProfile(); }
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-saved').classList.toggle('on', tab === 'saved');
+  document.getElementById('tab-passed').classList.toggle('on', tab === 'passed');
+  renderSaved();
 }
 
 // ══════════════════════════════════════
@@ -892,10 +923,12 @@ function doSwipe(dir) {
   localStorage.setItem('abode_stats', JSON.stringify(stats));
 
   // Mark as seen so it won't appear in future searches
-  seenKeys.add(listingKey(l));
+  const key = listingKey(l);
+  seenKeys.add(key);
   localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
 
   if (dir === 'save') saveListing(l);
+  if (dir === 'pass') passListing(key);
 
   setTimeout(() => { currentIdx++; renderCard(); }, 300);
 }
@@ -904,6 +937,16 @@ function doSwipe(dir) {
 //  Save / Unsave
 // ══════════════════════════════════════
 function listingKey(l) { return (l.url || l.title || '').toLowerCase().trim(); }
+
+async function passListing(key) {
+  try {
+    await fetch('/api/pass', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+  } catch (_) {}
+}
 
 async function saveListing(l) {
   const key = listingKey(l);
@@ -927,10 +970,10 @@ async function unsaveListing(key) {
 
 async function loadSaved() {
   try {
-    const res = await fetch('/api/saved');
-    if (res.status === 401) { goTo('s-login'); return; }
-    const data = await res.json();
-    savedListings = data.listings || [];
+    const [sr, pr] = await Promise.all([fetch('/api/saved'), fetch('/api/passed')]);
+    if (sr.status === 401) { goTo('s-login'); return; }
+    if (sr.ok) savedListings = (await sr.json()).listings || [];
+    if (pr.ok) passedKeys    = (await pr.json()).keys || [];
   } catch (_) {}
   renderSaved();
 }
@@ -939,47 +982,93 @@ async function loadSaved() {
 //  Saved screen
 // ══════════════════════════════════════
 function renderSaved() {
-  const list  = document.getElementById('saved-list');
-  const sub   = document.getElementById('saved-sub');
-  const count = savedListings.length;
-
-  sub.textContent = `${count} place${count !== 1 ? 's' : ''} you liked`;
-
+  const list      = document.getElementById('saved-list');
+  const sub       = document.getElementById('saved-sub');
+  const title     = document.getElementById('saved-title');
   const clearWrap = document.getElementById('saved-clear-wrap');
-  clearWrap.innerHTML = count > 0
-    ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>` : '';
 
-  if (count === 0) {
-    list.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">♡</div>
-        <div style="color:var(--text2);">No saved apartments yet</div>
-        <div style="color:var(--text3);font-size:13px;">Tap ♡ while swiping to save listings you like</div>
-      </div>`;
-    return;
-  }
+  if (activeTab === 'saved') {
+    const count = savedListings.length;
+    title.textContent = 'Saved apartments';
+    sub.textContent   = `${count} place${count !== 1 ? 's' : ''} you liked`;
+    clearWrap.innerHTML = count > 0
+      ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>` : '';
 
-  list.innerHTML = savedListings.map(l => {
-    const key = listingKey(l).replace(/'/g, "\\'");
-    return `
-      <div class="saved-card">
-        <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
-        <div class="saved-body">
-          <div class="saved-price">${esc(l.price) || '—'}</div>
-          <div class="saved-addr">${buildAddr(l)}</div>
-          <div class="saved-tags">
-            ${l.beds   ? `<div class="saved-tag">${l.beds}bd</div>`      : ''}
-            ${l.baths  ? `<div class="saved-tag">${l.baths}ba</div>`     : ''}
-            ${l.sqft   ? `<div class="saved-tag">${l.sqft}sqft</div>`    : ''}
-            ${l.source ? `<div class="saved-tag">${esc(l.source)}</div>` : ''}
+    if (count === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">♡</div>
+          <div style="color:var(--text2);">No saved apartments yet</div>
+          <div style="color:var(--text3);font-size:13px;">Tap ♡ while swiping to save listings you like</div>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = savedListings.map(l => {
+      const key = listingKey(l).replace(/'/g, "\\'");
+      return `
+        <div class="saved-card">
+          <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
+          <div class="saved-body">
+            <div class="saved-price">${esc(l.price) || '—'}</div>
+            <div class="saved-addr">${buildAddr(l)}</div>
+            <div class="saved-tags">
+              ${l.beds   ? `<div class="saved-tag">${l.beds}bd</div>`      : ''}
+              ${l.baths  ? `<div class="saved-tag">${l.baths}ba</div>`     : ''}
+              ${l.sqft   ? `<div class="saved-tag">${l.sqft}sqft</div>`    : ''}
+              ${l.source ? `<div class="saved-tag">${esc(l.source)}</div>` : ''}
+            </div>
           </div>
+          <div class="saved-actions">
+            ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
+            <button class="saved-btn remove" onclick="unsaveListing('${key}')">Remove</button>
+          </div>
+        </div>`;
+    }).join('');
+
+  } else {
+    // Passed tab — we only have keys, not full listing data
+    const count = passedKeys.length;
+    title.textContent = 'Passed apartments';
+    sub.textContent   = `${count} place${count !== 1 ? 's' : ''} you passed on`;
+    clearWrap.innerHTML = '';
+
+    if (count === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">✕</div>
+          <div style="color:var(--text2);">No passed apartments yet</div>
+          <div style="color:var(--text3);font-size:13px;">Listings you pass on will appear here</div>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = passedKeys.map(key => `
+      <div class="saved-card" style="opacity:0.6;">
+        <div class="saved-thumb" style="font-size:20px;color:var(--red);">✕</div>
+        <div class="saved-body">
+          <div class="saved-price" style="font-size:13px;color:var(--text2);">Passed listing</div>
+          <div class="saved-addr" style="font-size:11px;">${esc(key.length > 60 ? key.slice(0,60)+'…' : key)}</div>
         </div>
         <div class="saved-actions">
-          ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
-          <button class="saved-btn remove" onclick="unsaveListing('${key}')">Remove</button>
+          <button class="saved-btn view" onclick="reconsiderListing('${key.replace(/'/g,"\\'")}')">Reconsider</button>
         </div>
-      </div>`;
-  }).join('');
+      </div>`).join('');
+  }
+}
+
+async function reconsiderListing(key) {
+  passedKeys = passedKeys.filter(k => k !== key);
+  seenKeys.delete(key);
+  localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
+  try {
+    await fetch('/api/pass', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+  } catch (_) {}
+  renderSaved();
 }
 
 async function clearAllSaved() {
@@ -1027,15 +1116,12 @@ function esc(str) {
     const data = await res.json();
     if (data.authenticated) {
       currentUser = { email: data.email };
-      // Pre-seed seenKeys with saved listings so they never appear in search
+      // Pre-seed seenKeys with all saved + passed keys from the server
       try {
-        const sr = await fetch('/api/saved');
-        if (sr.ok) {
-          const sd = await sr.json();
-          savedListings = sd.listings || [];
-          savedListings.forEach(l => seenKeys.add(listingKey(l)));
-          localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
-        }
+        const [sr, sk] = await Promise.all([fetch('/api/saved'), fetch('/api/seen')]);
+        if (sr.ok) savedListings = (await sr.json()).listings || [];
+        if (sk.ok) (await sk.json()).keys.forEach(k => seenKeys.add(k));
+        localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
       } catch (_) {}
       goTo('s-profile');
     } else {

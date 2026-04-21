@@ -54,6 +54,13 @@ def init_db():
                 )
             """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS passed_listings (
+                    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    key      TEXT NOT NULL,
+                    PRIMARY KEY (user_id, key)
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS search_cache (
                     cache_key   TEXT PRIMARY KEY,
                     results     JSONB NOT NULL,
@@ -141,6 +148,26 @@ def clear_all(user_id: int) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM saved_listings WHERE user_id = %s", (user_id,))
+        conn.commit()
+
+
+# ── Passed listings helpers ───────────────────────────────────────────────────
+
+def load_passed_keys(user_id: int) -> list[str]:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key FROM passed_listings WHERE user_id = %s", (user_id,))
+            return [row[0] for row in cur.fetchall()]
+
+
+def pass_one(user_id: int, key: str) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO passed_listings (user_id, key)
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING
+            """, (user_id, key))
         conn.commit()
 
 
@@ -354,6 +381,55 @@ def clear_saved():
         return err
     clear_all(uid)
     return jsonify({"ok": True})
+
+
+@app.route("/api/pass", methods=["POST"])
+def pass_listing():
+    uid, err = require_auth()
+    if err:
+        return err
+    data = request.get_json(force=True) or {}
+    key  = (data.get("key") or "").lower().strip()
+    if not key:
+        return jsonify({"error": "key required"}), 400
+    pass_one(uid, key)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/pass", methods=["DELETE"])
+def unpass_listing():
+    uid, err = require_auth()
+    if err:
+        return err
+    data = request.get_json(force=True) or {}
+    key  = (data.get("key") or "").lower().strip()
+    if not key:
+        return jsonify({"error": "key required"}), 400
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM passed_listings WHERE user_id = %s AND key = %s", (uid, key))
+        conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/seen", methods=["GET"])
+def get_seen():
+    """Returns all keys the user has already saved or passed on."""
+    uid, err = require_auth()
+    if err:
+        return err
+    saved_keys  = [listing_key(l) for l in load_saved(uid)]
+    passed_keys = load_passed_keys(uid)
+    return jsonify({"keys": list(set(saved_keys + passed_keys))})
+
+
+@app.route("/api/passed", methods=["GET"])
+def get_passed():
+    uid, err = require_auth()
+    if err:
+        return err
+    keys = load_passed_keys(uid)
+    return jsonify({"keys": keys})
 
 
 @app.route("/api/cache/clear", methods=["POST"])
