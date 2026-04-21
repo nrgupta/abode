@@ -807,13 +807,7 @@ async function doLogout() {
 }
 
 function enterApp() {
-  // Go to setup or directly to swipe if we have a previous session
-  if (prefs) {
-    restorePrefs();
-    goTo('s-setup');
-  } else {
-    goTo('s-setup');
-  }
+  goTo('s-profile');
 }
 
 // ══════════════════════════════════════
@@ -1163,7 +1157,7 @@ function restorePrefs() {
     const data = await res.json();
     if (data.authenticated) {
       currentUser = { email: data.email };
-      goTo('s-setup');
+      goTo('s-profile');
     } else {
       goTo('s-login');
     }
