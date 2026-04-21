@@ -909,6 +909,8 @@ async function saveListing(l) {
   const key = listingKey(l);
   if (savedListings.some(s => listingKey(s) === key)) return;
   savedListings.push(l);
+  seenKeys.add(key);
+  localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
   try {
     await fetch('/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l) });
   } catch (_) {}
@@ -1025,6 +1027,16 @@ function esc(str) {
     const data = await res.json();
     if (data.authenticated) {
       currentUser = { email: data.email };
+      // Pre-seed seenKeys with saved listings so they never appear in search
+      try {
+        const sr = await fetch('/api/saved');
+        if (sr.ok) {
+          const sd = await sr.json();
+          savedListings = sd.listings || [];
+          savedListings.forEach(l => seenKeys.add(listingKey(l)));
+          localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
+        }
+      } catch (_) {}
       goTo('s-profile');
     } else {
       goTo('s-login');
