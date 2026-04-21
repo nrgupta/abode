@@ -596,6 +596,8 @@ let prefs       = JSON.parse(localStorage.getItem('abode_prefs') || 'null');
 let stats       = JSON.parse(localStorage.getItem('abode_stats') || '{"viewed":0,"passed":0}');
 let currentUser = null;
 let savedListings = [];
+// Keys of listings the user has already acted on (saved or passed) this session
+let seenKeys = new Set(JSON.parse(localStorage.getItem('abode_seen') || '[]'));
 
 // ══════════════════════════════════════
 //  Navigation
@@ -675,6 +677,8 @@ async function doSignup() {
 async function doLogout() {
   await fetch('/api/logout', { method: 'POST' });
   currentUser = null; savedListings = []; listings = []; currentIdx = 0;
+  seenKeys = new Set();
+  localStorage.removeItem('abode_seen');
   goTo('s-login');
 }
 
@@ -749,7 +753,15 @@ async function startSearch() {
     if (!res.ok) throw new Error(`Server error ${res.status}`);
     const data = await res.json();
 
-    listings   = Object.values(data.results || {}).flat();
+    const all = Object.values(data.results || {}).flat();
+    // Ensure saved listings are current before filtering
+    try {
+      const sr = await fetch('/api/saved');
+      if (sr.ok) savedListings = (await sr.json()).listings || [];
+    } catch (_) {}
+    // Filter out anything already saved or passed
+    const savedKeys = new Set(savedListings.map(s => listingKey(s)));
+    listings   = all.filter(l => !seenKeys.has(listingKey(l)) && !savedKeys.has(listingKey(l)));
     currentIdx = 0;
 
     if (listings.length === 0) {
@@ -878,6 +890,10 @@ function doSwipe(dir) {
   stats.viewed++;
   if (dir === 'pass') stats.passed++;
   localStorage.setItem('abode_stats', JSON.stringify(stats));
+
+  // Mark as seen so it won't appear in future searches
+  seenKeys.add(listingKey(l));
+  localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
 
   if (dir === 'save') saveListing(l);
 
