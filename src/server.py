@@ -1,6 +1,8 @@
 import asyncio
+import hashlib
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg2
@@ -14,8 +16,11 @@ from agent.listingsTool import run_agent
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "public"))
 
-PORT        = int(os.environ.get("PORT", 3000))
+PORT         = int(os.environ.get("PORT", 3000))
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# How long (in seconds) cached search results are considered fresh (default: 4 hours)
+CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", 4 * 60 * 60))
 
 
 # ── Database helpers ─────────────────────────────────────────────────────────
@@ -33,6 +38,69 @@ def init_db():
                     data JSONB NOT NULL
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS search_cache (
+                    cache_key   TEXT PRIMARY KEY,
+                    results     JSONB NOT NULL,
+                    cached_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+        conn.commit()
+
+
+# ── Search cache helpers ──────────────────────────────────────────────────────
+
+def _cache_key(filters: dict) -> str:
+    """Deterministic hash of the search filters used as the cache key."""
+    canonical = json.dumps(filters, sort_keys=True)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def cache_get(filters: dict) -> list[dict] | None:
+    """Return cached results if they exist and are within TTL, else None."""
+    if not DATABASE_URL:
+        return None
+    key = _cache_key(filters)
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT results, cached_at
+                FROM search_cache
+                WHERE cache_key = %s
+            """, (key,))
+            row = cur.fetchone()
+    if not row:
+        return None
+    age = (datetime.now(timezone.utc) - row["cached_at"]).total_seconds()
+    if age > CACHE_TTL_SECONDS:
+        return None
+    return row["results"]
+
+
+def cache_set(filters: dict, results: list[dict]) -> None:
+    """Persist search results to the cache."""
+    if not DATABASE_URL:
+        return
+    key = _cache_key(filters)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO search_cache (cache_key, results, cached_at)
+                VALUES (%s, %s, now())
+                ON CONFLICT (cache_key) DO UPDATE
+                    SET results   = EXCLUDED.results,
+                        cached_at = EXCLUDED.cached_at
+            """, (key, json.dumps(results)))
+        conn.commit()
+
+
+def cache_clear() -> None:
+    """Delete all cached search results."""
+    if not DATABASE_URL:
+        return
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM search_cache")
         conn.commit()
 
 
@@ -100,17 +168,28 @@ def search():
         "minBaths": int(min_baths) if min_baths else None,
     }
 
+    # Return cached results if fresh enough
+    cached = cache_get(filters)
+    if cached is not None:
+        grouped: dict[str, list] = {}
+        for listing in cached:
+            source = listing.get("source", "Other")
+            grouped.setdefault(source, []).append(listing)
+        return jsonify({"results": grouped, "total": len(cached), "cached": True})
+
     try:
         listings = asyncio.run(run_agent(filters, sources))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+    cache_set(filters, listings)
 
     grouped: dict[str, list] = {}
     for listing in listings:
         source = listing.get("source", "Other")
         grouped.setdefault(source, []).append(listing)
 
-    return jsonify({"results": grouped, "total": len(listings)})
+    return jsonify({"results": grouped, "total": len(listings), "cached": False})
 
 
 @app.route("/api/saved", methods=["GET"])
@@ -143,6 +222,12 @@ def unsave_listing():
 @app.route("/api/save/clear", methods=["POST"])
 def clear_saved():
     clear_all()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/cache/clear", methods=["POST"])
+def clear_cache():
+    cache_clear()
     return jsonify({"ok": True})
 
 
