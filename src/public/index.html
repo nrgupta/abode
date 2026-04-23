@@ -232,7 +232,7 @@
       align-items: center;
       gap: 14px;
       padding: 12px 20px 12px;
-      overflow: hidden;
+      overflow-y: auto;
     }
 
     .hint {
@@ -409,6 +409,70 @@
     .prow-edit .row2 { gap: 8px; }
 
     .divider { height: 0.5px; background: var(--border); }
+
+    /* ── Amenities ── */
+    .amenities {
+      width: 100%;
+      max-width: 460px;
+      background: var(--bg2);
+      border: 0.5px solid var(--border2);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      gap: 0;
+      flex-direction: column;
+    }
+    .amenities-title {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .amenities-row {
+      display: flex;
+      gap: 8px;
+      flex-direction: column;
+    }
+    .amenity-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .amenity-group-label {
+      font-size: 11px;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .amenity-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .amenity-chip {
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-size: 12px;
+      color: var(--text2);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .amenity-dist {
+      font-size: 11px;
+      color: var(--text3);
+    }
+    .amenities-loading {
+      font-size: 12px;
+      color: var(--text3);
+      text-align: center;
+      padding: 4px 0;
+    }
   </style>
 </head>
 <body>
@@ -873,7 +937,68 @@ function renderCard() {
       <div class="btn-swipe btn-pass" onclick="doSwipe('pass')" title="Pass">✕</div>
       <div class="btn-swipe btn-info" onclick="openListing()"   title="Open listing">↗</div>
       <div class="btn-swipe btn-save" onclick="doSwipe('save')" title="Save">♡</div>
+    </div>
+    <div class="amenities" id="amenities-box">
+      <div class="amenities-loading">Loading nearby amenities…</div>
     </div>`;
+
+  // Kick off amenities fetch for this listing
+  fetchAmenities(l);
+}
+
+function _fmtDist(m) {
+  return m < 1000 ? `${m}m` : `${(m / 1000).toFixed(1)}km`;
+}
+
+function renderAmenities(data) {
+  const box = document.getElementById('amenities-box');
+  if (!box) return;
+
+  const groups = [
+    { key: 'transit',  icon: '🚇', label: 'Transit' },
+    { key: 'grocery',  icon: '🛒', label: 'Grocery' },
+    { key: 'gym',      icon: '🏋️', label: 'Gym'    },
+  ];
+
+  let html = '<div class="amenities-title">Nearby</div><div class="amenities-row">';
+  for (const g of groups) {
+    const items = data[g.key] || [];
+    html += `<div class="amenity-group">
+      <div class="amenity-group-label">${g.icon} ${g.label}</div>
+      <div class="amenity-chips">`;
+    if (items.length === 0) {
+      html += `<div class="amenity-chip" style="color:var(--text3);">None nearby</div>`;
+    } else {
+      for (const item of items) {
+        html += `<div class="amenity-chip">${esc(item.name)}<span class="amenity-dist">${_fmtDist(item.distance_m)}</span></div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+async function fetchAmenities(l) {
+  const address = l.location || l.title || '';
+  if (!address) {
+    const box = document.getElementById('amenities-box');
+    if (box) box.style.display = 'none';
+    return;
+  }
+  try {
+    const res = await fetch('/api/amenities?' + new URLSearchParams({ address }));
+    if (!res.ok) {
+      const box = document.getElementById('amenities-box');
+      if (box) box.style.display = 'none';
+      return;
+    }
+    const data = await res.json();
+    renderAmenities(data);
+  } catch (_) {
+    const box = document.getElementById('amenities-box');
+    if (box) box.style.display = 'none';
+  }
 }
 
 function buildAddr(l) {

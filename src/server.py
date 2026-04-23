@@ -1,8 +1,11 @@
 import asyncio
 import hashlib
 import json
+import math
 import os
 import secrets
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,8 +21,9 @@ from agent.listingsTool import run_agent
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "public"))
 
-PORT         = int(os.environ.get("PORT", 3000))
-DATABASE_URL = os.environ.get("DATABASE_URL")
+PORT                  = int(os.environ.get("PORT", 3000))
+DATABASE_URL          = os.environ.get("DATABASE_URL")
+GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 
 # Secret key for signing session cookies — set SESSION_SECRET in env for production
 app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
@@ -436,6 +440,82 @@ def get_passed():
 def clear_cache():
     cache_clear()
     return jsonify({"ok": True})
+
+
+# ── Amenities ─────────────────────────────────────────────────────────────────
+
+def _places_request(path: str, params: dict) -> dict:
+    """Make a GET request to the Google Places API and return parsed JSON."""
+    params["key"] = GOOGLE_PLACES_API_KEY
+    url = "https://maps.googleapis.com/maps/api" + path + "?" + urllib.parse.urlencode(params)
+    with urllib.request.urlopen(url, timeout=8) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _geocode(address: str) -> tuple[float, float] | None:
+    """Return (lat, lng) for an address string, or None on failure."""
+    data = _places_request("/geocode/json", {"address": address})
+    results = data.get("results")
+    if not results:
+        return None
+    loc = results[0]["geometry"]["location"]
+    return loc["lat"], loc["lng"]
+
+
+def _haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
+    """Approximate distance in metres between two lat/lng points."""
+    R = 6_371_000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    return int(2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+
+def _nearby_places(lat: float, lng: float, place_type: str, radius: int = 1200) -> list[dict]:
+    """Return up to 3 nearby places of a given type."""
+    data = _places_request("/place/nearbysearch/json", {
+        "location": f"{lat},{lng}",
+        "radius": radius,
+        "type": place_type,
+    })
+    out = []
+    for p in (data.get("results") or [])[:3]:
+        ploc = p["geometry"]["location"]
+        dist = _haversine_meters(lat, lng, ploc["lat"], ploc["lng"])
+        out.append({
+            "name": p.get("name", ""),
+            "distance_m": dist,
+        })
+    return out
+
+
+@app.route("/api/amenities", methods=["GET"])
+def get_amenities():
+    uid, err = require_auth()
+    if err:
+        return err
+
+    address = (request.args.get("address") or "").strip()
+    if not address:
+        return jsonify({"error": "address param required"}), 400
+    if not GOOGLE_PLACES_API_KEY:
+        return jsonify({"error": "Places API not configured"}), 503
+
+    try:
+        coords = _geocode(address)
+        if not coords:
+            return jsonify({"error": "Could not geocode address"}), 404
+        lat, lng = coords
+
+        transit, grocery, gym = (
+            _nearby_places(lat, lng, "subway_station"),
+            _nearby_places(lat, lng, "supermarket"),
+            _nearby_places(lat, lng, "gym"),
+        )
+        return jsonify({"transit": transit, "grocery": grocery, "gym": gym})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
