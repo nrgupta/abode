@@ -290,11 +290,25 @@
       border-radius: 20px; padding: 5px 12px; font-size: 12px;
       border: 0.5px solid rgba(255,255,255,0.1);
     }
-    .apt-body { padding: 14px 16px; }
+    .apt-body { padding: 14px 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+    .apt-body-left { flex: 1; min-width: 0; }
     .apt-price { font-size: 22px; font-weight: 500; color: var(--text); }
     .apt-addr  { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
     .apt-tags  { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
     .apt-tag { background: var(--bg3); border-radius: 8px; padding: 4px 10px; font-size: 12px; color: var(--text2); }
+    .apt-map-btn {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: var(--bg3);
+      border: 0.5px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+      text-decoration: none;
+      transition: background 0.15s;
+      margin-bottom: 2px;
+    }
+    .apt-map-btn:hover { background: var(--bg); }
     .swipe-ov {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
@@ -413,32 +427,18 @@
     /* ── Amenities ── */
     .amenities {
       width: 100%;
-      max-width: 460px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .amenity-card {
       background: var(--bg2);
       border: 0.5px solid var(--border2);
       border-radius: 14px;
-      padding: 12px 14px;
+      padding: 12px 12px;
       display: flex;
       flex-direction: column;
-      gap: 0;
-    }
-    .amenities-title {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text3);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 10px;
-    }
-    .amenities-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-    }
-    .amenity-group {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
+      gap: 8px;
     }
     .amenity-group-label {
       font-size: 11px;
@@ -447,7 +447,6 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-bottom: 2px;
     }
     .amenity-chips {
       display: flex;
@@ -457,7 +456,7 @@
     .amenity-chip {
       background: var(--bg3);
       border-radius: 7px;
-      padding: 4px 8px;
+      padding: 5px 8px;
       font-size: 11px;
       color: var(--text2);
       display: flex;
@@ -466,7 +465,7 @@
       text-decoration: none;
       transition: background 0.15s;
     }
-    a.amenity-chip:hover { background: var(--bg2); border: 0.5px solid var(--border2); }
+    a.amenity-chip:hover { background: var(--bg); border: 0.5px solid var(--border2); }
     .amenity-chip-name {
       white-space: nowrap;
       overflow: hidden;
@@ -482,7 +481,8 @@
       font-size: 12px;
       color: var(--text3);
       text-align: center;
-      padding: 4px 0;
+      padding: 8px 0;
+      grid-column: 1 / -1;
     }
   </style>
 </head>
@@ -944,9 +944,12 @@ function renderCard() {
         <div class="badge-source">${esc(l.source || '')}</div>
       </div>
       <div class="apt-body">
-        <div class="apt-price">${esc(l.price) || '—'}</div>
-        <div class="apt-addr">${buildAddr(l)}</div>
-        <div class="apt-tags">${buildTags(l)}</div>
+        <div class="apt-body-left">
+          <div class="apt-price">${esc(l.price) || '—'}</div>
+          <div class="apt-addr">${buildAddr(l)}</div>
+          <div class="apt-tags">${buildTags(l)}</div>
+        </div>
+        ${l.location ? `<a class="apt-map-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.location)}" target="_blank" rel="noopener" title="Open in Google Maps">📍</a>` : ''}
       </div>
     </div>
     <div class="btns">
@@ -955,7 +958,7 @@ function renderCard() {
       <div class="btn-swipe btn-save" onclick="doSwipe('save')" title="Save">♡</div>
     </div>
     <div class="amenities" id="amenities-box">
-      <div class="amenities-loading">Loading nearby amenities…</div>
+      <div class="amenities-loading" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:14px;padding:12px;">Loading nearby amenities…</div>
     </div>`;
 
   // Show amenities from cache or wait for prefetch
@@ -972,15 +975,15 @@ function renderAmenities(data) {
   if (!box) return;
 
   const groups = [
-    { key: 'transit',  icon: '🚇', label: 'Transit' },
     { key: 'grocery',  icon: '🛒', label: 'Grocery' },
+    { key: 'transit',  icon: '🚇', label: 'Transit' },
     { key: 'gym',      icon: '🏋️', label: 'Gym'    },
   ];
 
-  let html = '<div class="amenities-title">Nearby</div><div class="amenities-row">';
+  let html = '';
   for (const g of groups) {
     const items = data[g.key] || [];
-    html += `<div class="amenity-group">
+    html += `<div class="amenity-card">
       <div class="amenity-group-label">${g.icon} ${g.label}</div>
       <div class="amenity-chips">`;
     if (items.length === 0) {
@@ -997,7 +1000,6 @@ function renderAmenities(data) {
     }
     html += `</div></div>`;
   }
-  html += '</div>';
   box.innerHTML = html;
 }
 
