@@ -521,15 +521,23 @@ def get_amenities():
     if err:
         return err
 
-    address = (request.args.get("address") or "").strip()
-    if not address:
-        return jsonify({"error": "address param required"}), 400
-
     try:
-        coords = _geocode(address)
-        if not coords:
-            return jsonify({"error": "Could not geocode address"}), 404
-        lat, lng = coords
+        # Use pre-scraped coords if provided (avoids geocoding entirely)
+        raw_lat = request.args.get("lat")
+        raw_lng = request.args.get("lng")
+        if raw_lat and raw_lng:
+            lat, lng = float(raw_lat), float(raw_lng)
+        else:
+            address = (request.args.get("address") or "").strip()
+            if not address:
+                return jsonify({"error": "lat/lng or address param required"}), 400
+            # Append city hint if not already present so Nominatim resolves correctly
+            if "chicago" not in address.lower():
+                address = address + ", Chicago, IL"
+            coords = _geocode(address)
+            if not coords:
+                return jsonify({"error": "Could not geocode address"}), 404
+            lat, lng = coords
 
         transit = _overpass_nearby(lat, lng, "transit")
         grocery = _overpass_nearby(lat, lng, "grocery")

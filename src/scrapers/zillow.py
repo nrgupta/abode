@@ -127,7 +127,7 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         if not numeric_price:
             continue
 
-        listings.append({
+        listing = {
             "title":     r.get("address", ""),
             "price":     f"${numeric_price}/mo",
             "location":  r.get("address", ""),
@@ -138,6 +138,13 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "image":     r.get("imgSrc", ""),
             "source":    "Zillow",
             "scrapedAt": datetime.now(timezone.utc).isoformat(),
-        })
+        }
+        # Store lat/lng if available — used by amenities endpoint to skip geocoding
+        lat = r.get("latLong", {}).get("latitude") or r.get("latitude")
+        lng = r.get("latLong", {}).get("longitude") or r.get("longitude")
+        if lat and lng:
+            listing["lat"] = lat
+            listing["lng"] = lng
+        listings.append(listing)
 
     return listings

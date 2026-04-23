@@ -980,23 +980,22 @@ function renderAmenities(data) {
 }
 
 async function fetchAmenities(l) {
-  const address = l.location || l.title || '';
-  if (!address) {
-    const box = document.getElementById('amenities-box');
-    if (box) box.style.display = 'none';
-    return;
+  const box = document.getElementById('amenities-box');
+  let params;
+  if (l.lat && l.lng) {
+    // Use pre-scraped coords — no geocoding needed
+    params = new URLSearchParams({ lat: l.lat, lng: l.lng });
+  } else {
+    const address = l.location || l.title || '';
+    if (!address) { if (box) box.style.display = 'none'; return; }
+    params = new URLSearchParams({ address });
   }
   try {
-    const res = await fetch('/api/amenities?' + new URLSearchParams({ address }));
-    if (!res.ok) {
-      const box = document.getElementById('amenities-box');
-      if (box) box.style.display = 'none';
-      return;
-    }
+    const res = await fetch('/api/amenities?' + params);
+    if (!res.ok) { if (box) box.style.display = 'none'; return; }
     const data = await res.json();
     renderAmenities(data);
   } catch (_) {
-    const box = document.getElementById('amenities-box');
     if (box) box.style.display = 'none';
   }
 }
