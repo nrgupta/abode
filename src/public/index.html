@@ -393,7 +393,7 @@
       transition: color 0.15s, border-color 0.15s;
     }
     .tab.on { color: var(--green); border-bottom-color: var(--green); font-weight: 500; }
-    .saved-list { padding: 12px 20px 8px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
+    .saved-list { padding: 12px 20px 8px; display: flex; flex-direction: column; gap: 10px; }
     .saved-card {
       display: flex; border-radius: 14px; overflow: hidden;
       border: 0.5px solid var(--border2); background: var(--bg2);
@@ -682,7 +682,7 @@
   </div>
 
   <!-- Saved / Passed list view (hidden by default) -->
-  <div id="disc-list-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+  <div id="disc-list-view" style="display:none;flex:1;flex-direction:column;overflow-y:auto;min-height:0;">
     <div class="saved-list" id="saved-list"></div>
     <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
   </div>
