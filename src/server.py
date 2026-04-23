@@ -506,8 +506,10 @@ def _overpass_nearby(lat: float, lng: float, category: str, radius: int = 1200) 
         if not name or name in seen_names:
             continue
         seen_names.add(name)
-        dist = _haversine_meters(lat, lng, el["lat"], el["lon"])
-        out.append({"name": name, "distance_m": dist})
+        elat, elng = el["lat"], el["lon"]
+        dist = _haversine_meters(lat, lng, elat, elng)
+        maps_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(name)}&query_place_id=&center={elat},{elng}"
+        out.append({"name": name, "distance_m": dist, "url": maps_url})
         if len(out) == 3:
             break
 

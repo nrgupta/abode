@@ -259,7 +259,7 @@
       cursor: default;
     }
     .apt-photo {
-      height: 220px;
+      height: 200px;
       position: relative;
       overflow: hidden;
       background: var(--bg3);
@@ -419,8 +419,8 @@
       border-radius: 14px;
       padding: 12px 14px;
       display: flex;
-      gap: 0;
       flex-direction: column;
+      gap: 0;
     }
     .amenities-title {
       font-size: 11px;
@@ -428,43 +428,54 @@
       color: var(--text3);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     .amenities-row {
-      display: flex;
-      gap: 8px;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
     }
     .amenity-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
     }
     .amenity-group-label {
       font-size: 11px;
+      font-weight: 500;
       color: var(--text3);
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
+      margin-bottom: 2px;
     }
     .amenity-chips {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-direction: column;
+      gap: 4px;
     }
     .amenity-chip {
       background: var(--bg3);
-      border-radius: 8px;
-      padding: 4px 9px;
-      font-size: 12px;
+      border-radius: 7px;
+      padding: 4px 8px;
+      font-size: 11px;
       color: var(--text2);
       display: flex;
-      align-items: center;
-      gap: 4px;
+      flex-direction: column;
+      gap: 1px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    a.amenity-chip:hover { background: var(--bg2); border: 0.5px solid var(--border2); }
+    .amenity-chip-name {
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 11px;
+      color: var(--text2);
     }
     .amenity-dist {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text3);
     }
     .amenities-loading {
@@ -947,7 +958,8 @@ function renderCard() {
 }
 
 function _fmtDist(m) {
-  return m < 1000 ? `${m}m` : `${(m / 1000).toFixed(1)}km`;
+  const miles = m / 1609.34;
+  return miles < 0.1 ? `${Math.round(m * 3.281)}ft` : `${miles.toFixed(1)}mi`;
 }
 
 function renderAmenities(data) {
@@ -967,10 +979,15 @@ function renderAmenities(data) {
       <div class="amenity-group-label">${g.icon} ${g.label}</div>
       <div class="amenity-chips">`;
     if (items.length === 0) {
-      html += `<div class="amenity-chip" style="color:var(--text3);">None nearby</div>`;
+      html += `<div class="amenity-chip"><span class="amenity-chip-name" style="color:var(--text3);">None nearby</span></div>`;
     } else {
       for (const item of items) {
-        html += `<div class="amenity-chip">${esc(item.name)}<span class="amenity-dist">${_fmtDist(item.distance_m)}</span></div>`;
+        const inner = `<span class="amenity-chip-name">${esc(item.name)}</span><span class="amenity-dist">${_fmtDist(item.distance_m)}</span>`;
+        if (item.url) {
+          html += `<a class="amenity-chip" href="${esc(item.url)}" target="_blank" rel="noopener">${inner}</a>`;
+        } else {
+          html += `<div class="amenity-chip">${inner}</div>`;
+        }
       }
     }
     html += `</div></div>`;
