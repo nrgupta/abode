@@ -352,15 +352,26 @@
       padding: 11px 14px; font-size: 13px; text-align: center;
     }
 
-    /* ── Discover embedded saved section ── */
-    .disc-saved-section {
-      flex-shrink: 0;
+    /* ── Discover sub-tabs ── */
+    .disc-tabs {
       display: flex;
-      flex-direction: column;
-      border-top: 0.5px solid var(--border);
-      max-height: 280px;
-      overflow: hidden;
+      padding: 0 20px;
+      gap: 0;
+      border-bottom: 0.5px solid var(--border);
+      flex-shrink: 0;
     }
+    .disc-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      font-size: 13px;
+      color: var(--text3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -0.5px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .disc-tab.on { color: var(--green); border-bottom-color: var(--green); font-weight: 500; }
 
     /* ── Saved screen ── */
     .saved-hdr { padding: 4px 24px 8px; flex-shrink: 0; }
@@ -653,8 +664,16 @@
     <button class="search-btn" id="searchBtn" onclick="startSearch()">Search →</button>
   </div>
 
+  <!-- Discover / Saved / Passed sub-tabs -->
+  <div class="disc-tabs">
+    <div class="disc-tab on" id="dtab-discover" onclick="switchDiscoverTab('discover')">Discover</div>
+    <div class="disc-tab"    id="dtab-saved"    onclick="switchDiscoverTab('saved')">Saved</div>
+    <div class="disc-tab"    id="dtab-passed"   onclick="switchDiscoverTab('passed')">Passed</div>
+  </div>
+
   <div id="discover-error" style="padding: 0 20px;"></div>
 
+  <!-- Swipe view -->
   <div class="swipe-area" id="swipe-area">
     <div class="empty-state">
       <div class="empty-icon">🏙️</div>
@@ -662,12 +681,8 @@
     </div>
   </div>
 
-  <!-- Saved / Passed section embedded in Discover -->
-  <div class="disc-saved-section">
-    <div class="tab-bar" style="padding: 0 20px 10px;">
-      <div class="tab on" id="tab-saved" onclick="switchTab('saved')">Saved</div>
-      <div class="tab"    id="tab-passed" onclick="switchTab('passed')">Passed</div>
-    </div>
+  <!-- Saved / Passed list view (hidden by default) -->
+  <div id="disc-list-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
     <div class="saved-list" id="saved-list"></div>
     <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
   </div>
@@ -723,15 +738,31 @@ let amenitiesCache = {};
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 's-discover') { loadSaved(); }
+  if (id === 's-discover') { loadSaved(); switchDiscoverTab('discover'); }
   if (id === 's-profile')  { renderProfile(); }
 }
 
-function switchTab(tab) {
-  activeTab = tab;
-  document.getElementById('tab-saved').classList.toggle('on', tab === 'saved');
-  document.getElementById('tab-passed').classList.toggle('on', tab === 'passed');
-  renderSaved();
+let discoverTab = 'discover'; // 'discover' | 'saved' | 'passed'
+
+function switchDiscoverTab(tab) {
+  discoverTab = tab;
+  ['discover','saved','passed'].forEach(t => {
+    document.getElementById('dtab-' + t).classList.toggle('on', t === tab);
+  });
+  const swipeArea  = document.getElementById('swipe-area');
+  const listView   = document.getElementById('disc-list-view');
+  const errEl      = document.getElementById('discover-error');
+  if (tab === 'discover') {
+    swipeArea.style.display = '';
+    listView.style.display  = 'none';
+    errEl.style.display     = '';
+  } else {
+    swipeArea.style.display = 'none';
+    listView.style.display  = 'flex';
+    errEl.style.display     = 'none';
+    activeTab = tab;
+    renderSaved();
+  }
 }
 
 // ══════════════════════════════════════
