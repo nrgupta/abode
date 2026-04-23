@@ -21,9 +21,8 @@ from agent.listingsTool import run_agent
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "public"))
 
-PORT                  = int(os.environ.get("PORT", 3000))
-DATABASE_URL          = os.environ.get("DATABASE_URL")
-GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+PORT         = int(os.environ.get("PORT", 3000))
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # Secret key for signing session cookies — set SESSION_SECRET in env for production
 app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
@@ -442,24 +441,24 @@ def clear_cache():
     return jsonify({"ok": True})
 
 
-# ── Amenities ─────────────────────────────────────────────────────────────────
+# ── Amenities (OpenStreetMap — free, no API key) ──────────────────────────────
 
-def _places_request(path: str, params: dict) -> dict:
-    """Make a GET request to the Google Places API and return parsed JSON."""
-    params["key"] = GOOGLE_PLACES_API_KEY
-    url = "https://maps.googleapis.com/maps/api" + path + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=8) as resp:
+_OSM_HEADERS = {"User-Agent": "Abode/1.0 (apartment search app)"}
+
+
+def _osm_get(url: str) -> dict | list:
+    req = urllib.request.Request(url, headers=_OSM_HEADERS)
+    with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read().decode())
 
 
 def _geocode(address: str) -> tuple[float, float] | None:
-    """Return (lat, lng) for an address string, or None on failure."""
-    data = _places_request("/geocode/json", {"address": address})
-    results = data.get("results")
+    """Return (lat, lng) via Nominatim, or None on failure."""
+    params = urllib.parse.urlencode({"q": address, "format": "json", "limit": 1})
+    results = _osm_get(f"https://nominatim.openstreetmap.org/search?{params}")
     if not results:
         return None
-    loc = results[0]["geometry"]["location"]
-    return loc["lat"], loc["lng"]
+    return float(results[0]["lat"]), float(results[0]["lon"])
 
 
 def _haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
@@ -472,21 +471,47 @@ def _haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> int
     return int(2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
 
-def _nearby_places(lat: float, lng: float, place_type: str, radius: int = 1200) -> list[dict]:
-    """Return up to 3 nearby places of a given type."""
-    data = _places_request("/place/nearbysearch/json", {
-        "location": f"{lat},{lng}",
-        "radius": radius,
-        "type": place_type,
-    })
+# Overpass amenity tags to query for each category
+_OVERPASS_TAGS = {
+    "transit": [
+        '["railway"~"subway_entrance|station|tram_stop"]',
+        '["public_transport"="stop_position"]["bus"="yes"]',
+    ],
+    "grocery": [
+        '["shop"~"supermarket|grocery|convenience"]',
+    ],
+    "gym": [
+        '["leisure"~"fitness_centre|sports_centre"]',
+        '["amenity"="gym"]',
+    ],
+}
+
+
+def _overpass_nearby(lat: float, lng: float, category: str, radius: int = 1200) -> list[dict]:
+    """Query Overpass API for nearby OSM nodes/ways and return up to 3 results."""
+    tag_filters = _OVERPASS_TAGS.get(category, [])
+    # Build a union of node queries for each tag filter
+    union_parts = []
+    for tag in tag_filters:
+        union_parts.append(f'node{tag}(around:{radius},{lat},{lng});')
+    query = f"[out:json][timeout:8];({' '.join(union_parts)});out body 10;"
+    params = urllib.parse.urlencode({"data": query})
+    data = _osm_get(f"https://overpass-api.de/api/interpreter?{params}")
+
+    seen_names: set[str] = set()
     out = []
-    for p in (data.get("results") or [])[:3]:
-        ploc = p["geometry"]["location"]
-        dist = _haversine_meters(lat, lng, ploc["lat"], ploc["lng"])
-        out.append({
-            "name": p.get("name", ""),
-            "distance_m": dist,
-        })
+    for el in (data.get("elements") or []):
+        tags = el.get("tags", {})
+        name = tags.get("name") or tags.get("ref") or ""
+        if not name or name in seen_names:
+            continue
+        seen_names.add(name)
+        dist = _haversine_meters(lat, lng, el["lat"], el["lon"])
+        out.append({"name": name, "distance_m": dist})
+        if len(out) == 3:
+            break
+
+    out.sort(key=lambda x: x["distance_m"])
     return out
 
 
@@ -499,8 +524,6 @@ def get_amenities():
     address = (request.args.get("address") or "").strip()
     if not address:
         return jsonify({"error": "address param required"}), 400
-    if not GOOGLE_PLACES_API_KEY:
-        return jsonify({"error": "Places API not configured"}), 503
 
     try:
         coords = _geocode(address)
@@ -508,11 +531,9 @@ def get_amenities():
             return jsonify({"error": "Could not geocode address"}), 404
         lat, lng = coords
 
-        transit, grocery, gym = (
-            _nearby_places(lat, lng, "subway_station"),
-            _nearby_places(lat, lng, "supermarket"),
-            _nearby_places(lat, lng, "gym"),
-        )
+        transit = _overpass_nearby(lat, lng, "transit")
+        grocery = _overpass_nearby(lat, lng, "grocery")
+        gym     = _overpass_nearby(lat, lng, "gym")
         return jsonify({"transit": transit, "grocery": grocery, "gym": gym})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
