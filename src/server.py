@@ -471,50 +471,58 @@ def _haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> int
     return int(2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
 
-# Overpass amenity tags to query for each category
-_OVERPASS_TAGS = {
-    "transit": [
-        '["railway"~"subway_entrance|station|tram_stop"]',
-        '["public_transport"="stop_position"]["bus"="yes"]',
-    ],
-    "grocery": [
-        '["shop"~"supermarket|grocery|convenience"]',
-    ],
-    "gym": [
-        '["leisure"~"fitness_centre|sports_centre"]',
-        '["amenity"="gym"]',
-    ],
-}
-
-
-def _overpass_nearby(lat: float, lng: float, category: str, radius: int = 1200) -> list[dict]:
-    """Query Overpass API for nearby OSM nodes/ways and return up to 3 results."""
-    tag_filters = _OVERPASS_TAGS.get(category, [])
-    # Build a union of node queries for each tag filter
-    union_parts = []
-    for tag in tag_filters:
-        union_parts.append(f'node{tag}(around:{radius},{lat},{lng});')
-    query = f"[out:json][timeout:8];({' '.join(union_parts)});out body 10;"
+def _overpass_all(lat: float, lng: float, radius: int = 1200) -> dict:
+    """Single Overpass query fetching transit, grocery, and gym nodes together."""
+    around = f"around:{radius},{lat},{lng}"
+    query = f"""
+[out:json][timeout:20];
+(
+  node["railway"~"subway_entrance|station|tram_stop"]({around});
+  node["public_transport"="stop_position"]["bus"="yes"]({around});
+  node["shop"~"supermarket|grocery|convenience"]({around});
+  node["leisure"~"fitness_centre|sports_centre"]({around});
+  node["amenity"="gym"]({around});
+);
+out body 60;
+"""
     params = urllib.parse.urlencode({"data": query})
     data = _osm_get(f"https://overpass-api.de/api/interpreter?{params}")
 
-    seen_names: set[str] = set()
-    out = []
+    def _category(tags: dict) -> str | None:
+        railway = tags.get("railway", "")
+        pt      = tags.get("public_transport", "")
+        shop    = tags.get("shop", "")
+        leisure = tags.get("leisure", "")
+        amenity = tags.get("amenity", "")
+        if railway in ("subway_entrance", "station", "tram_stop") or (pt == "stop_position" and tags.get("bus") == "yes"):
+            return "transit"
+        if shop in ("supermarket", "grocery", "convenience"):
+            return "grocery"
+        if leisure in ("fitness_centre", "sports_centre") or amenity == "gym":
+            return "gym"
+        return None
+
+    buckets: dict[str, list] = {"transit": [], "grocery": [], "gym": []}
+    seen: dict[str, set] = {"transit": set(), "grocery": set(), "gym": set()}
+
     for el in (data.get("elements") or []):
         tags = el.get("tags", {})
         name = tags.get("name") or tags.get("ref") or ""
-        if not name or name in seen_names:
+        if not name:
             continue
-        seen_names.add(name)
+        cat = _category(tags)
+        if not cat or name in seen[cat] or len(buckets[cat]) >= 3:
+            continue
+        seen[cat].add(name)
         elat, elng = el["lat"], el["lon"]
         dist = _haversine_meters(lat, lng, elat, elng)
-        maps_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(name)}&query_place_id=&center={elat},{elng}"
-        out.append({"name": name, "distance_m": dist, "url": maps_url})
-        if len(out) == 3:
-            break
+        maps_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(name)}&center={elat},{elng}"
+        buckets[cat].append({"name": name, "distance_m": dist, "url": maps_url})
 
-    out.sort(key=lambda x: x["distance_m"])
-    return out
+    for cat in buckets:
+        buckets[cat].sort(key=lambda x: x["distance_m"])
+
+    return buckets
 
 
 @app.route("/api/amenities", methods=["GET"])
@@ -541,10 +549,8 @@ def get_amenities():
                 return jsonify({"error": "Could not geocode address"}), 404
             lat, lng = coords
 
-        transit = _overpass_nearby(lat, lng, "transit")
-        grocery = _overpass_nearby(lat, lng, "grocery")
-        gym     = _overpass_nearby(lat, lng, "gym")
-        return jsonify({"transit": transit, "grocery": grocery, "gym": gym})
+        buckets = _overpass_all(lat, lng)
+        return jsonify({"transit": buckets["transit"], "grocery": buckets["grocery"], "gym": buckets["gym"]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

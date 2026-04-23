@@ -697,6 +697,8 @@ let passedKeys    = [];   // just keys — we don't store full passed listing da
 let activeTab     = 'saved';
 // Keys of listings the user has already acted on (saved or passed) this session
 let seenKeys = new Set(JSON.parse(localStorage.getItem('abode_seen') || '[]'));
+// Amenities cache: listingKey → { data } | { promise } | null
+let amenitiesCache = {};
 
 // ══════════════════════════════════════
 //  Navigation
@@ -869,12 +871,15 @@ async function startSearch() {
     const savedKeys = new Set(savedListings.map(s => listingKey(s)));
     listings   = all.filter(l => !seenKeys.has(listingKey(l)) && !savedKeys.has(listingKey(l)));
     currentIdx = 0;
+    amenitiesCache = {};
 
     if (listings.length === 0) {
       showSwipeEmpty('No listings found — try adjusting your filters.');
       return;
     }
     renderCard();
+    // Prefetch amenities for all listings in the background
+    prefetchAmenities(listings);
   } catch (e) {
     showSwipeEmpty(`Error: ${e.message}`);
   } finally {
@@ -953,8 +958,8 @@ function renderCard() {
       <div class="amenities-loading">Loading nearby amenities…</div>
     </div>`;
 
-  // Kick off amenities fetch for this listing
-  fetchAmenities(l);
+  // Show amenities from cache or wait for prefetch
+  showAmenitiesForCurrent(l);
 }
 
 function _fmtDist(m) {
@@ -996,25 +1001,48 @@ function renderAmenities(data) {
   box.innerHTML = html;
 }
 
-async function fetchAmenities(l) {
+function _amenityParams(l) {
+  if (l.lat && l.lng) return new URLSearchParams({ lat: l.lat, lng: l.lng });
+  const address = l.location || l.title || '';
+  if (!address) return null;
+  return new URLSearchParams({ address });
+}
+
+// Prefetch amenities for all listings sequentially in the background
+async function prefetchAmenities(list) {
+  for (const l of list) {
+    const key = listingKey(l);
+    if (amenitiesCache[key]) continue;
+    const params = _amenityParams(l);
+    if (!params) { amenitiesCache[key] = null; continue; }
+    try {
+      const res = await fetch('/api/amenities?' + params);
+      amenitiesCache[key] = res.ok ? await res.json() : null;
+    } catch (_) {
+      amenitiesCache[key] = null;
+    }
+    // If this is the card currently on screen, update it live
+    if (listings[currentIdx] && listingKey(listings[currentIdx]) === key) {
+      if (amenitiesCache[key]) renderAmenities(amenitiesCache[key]);
+      else {
+        const box = document.getElementById('amenities-box');
+        if (box) box.style.display = 'none';
+      }
+    }
+  }
+}
+
+// Show amenities for the current card — instantly from cache or wait for prefetch
+function showAmenitiesForCurrent(l) {
+  const key = listingKey(l);
   const box = document.getElementById('amenities-box');
-  let params;
-  if (l.lat && l.lng) {
-    // Use pre-scraped coords — no geocoding needed
-    params = new URLSearchParams({ lat: l.lat, lng: l.lng });
-  } else {
-    const address = l.location || l.title || '';
-    if (!address) { if (box) box.style.display = 'none'; return; }
-    params = new URLSearchParams({ address });
+  if (!box) return;
+  if (key in amenitiesCache) {
+    // Already resolved
+    if (amenitiesCache[key]) renderAmenities(amenitiesCache[key]);
+    else box.style.display = 'none';
   }
-  try {
-    const res = await fetch('/api/amenities?' + params);
-    if (!res.ok) { if (box) box.style.display = 'none'; return; }
-    const data = await res.json();
-    renderAmenities(data);
-  } catch (_) {
-    if (box) box.style.display = 'none';
-  }
+  // If not yet in cache, the prefetch loop will update it when it arrives
 }
 
 function buildAddr(l) {
