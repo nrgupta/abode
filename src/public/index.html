@@ -352,6 +352,16 @@
       padding: 11px 14px; font-size: 13px; text-align: center;
     }
 
+    /* ── Discover embedded saved section ── */
+    .disc-saved-section {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-top: 0.5px solid var(--border);
+      max-height: 280px;
+      overflow: hidden;
+    }
+
     /* ── Saved screen ── */
     .saved-hdr { padding: 4px 24px 8px; flex-shrink: 0; }
     .tab-bar {
@@ -372,7 +382,7 @@
       transition: color 0.15s, border-color 0.15s;
     }
     .tab.on { color: var(--green); border-bottom-color: var(--green); font-weight: 500; }
-    .saved-list { padding: 12px 20px 0; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
+    .saved-list { padding: 12px 20px 8px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
     .saved-card {
       display: flex; border-radius: 14px; overflow: hidden;
       border: 0.5px solid var(--border2); background: var(--bg2);
@@ -603,7 +613,7 @@
   <div class="nav">
     <div class="nav-item on"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-saved')"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
@@ -652,34 +662,41 @@
     </div>
   </div>
 
+  <!-- Saved / Passed section embedded in Discover -->
+  <div class="disc-saved-section">
+    <div class="tab-bar" style="padding: 0 20px 10px;">
+      <div class="tab on" id="tab-saved" onclick="switchTab('saved')">Saved</div>
+      <div class="tab"    id="tab-passed" onclick="switchTab('passed')">Passed</div>
+    </div>
+    <div class="saved-list" id="saved-list"></div>
+    <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
+  </div>
+
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item on"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-saved')"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
 <!-- ════════════════════════════
-     SCREEN — Saved
+     SCREEN — Listing Agent
 ════════════════════════════ -->
-<div class="screen" id="s-saved">
+<div class="screen" id="s-agent">
   <div class="top-bar">
     <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
   </div>
-  <div class="saved-hdr">
-    <div class="sec-title" id="saved-title">Saved apartments</div>
-    <div class="sec-sub" id="saved-sub">0 places you liked</div>
+  <div class="content" style="justify-content:center;align-items:center;flex:1;">
+    <div class="empty-state">
+      <div class="empty-icon">✦</div>
+      <div style="color:var(--text2);font-size:16px;">Listing Agent</div>
+      <div style="color:var(--text3);font-size:13px;">Coming soon</div>
+    </div>
   </div>
-  <div class="tab-bar">
-    <div class="tab on" id="tab-saved" onclick="switchTab('saved')">Saved</div>
-    <div class="tab"    id="tab-passed" onclick="switchTab('passed')">Passed</div>
-  </div>
-  <div class="saved-list" id="saved-list"></div>
-  <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item on"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item on"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
@@ -706,8 +723,8 @@ let amenitiesCache = {};
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 's-saved')   { activeTab = 'saved'; document.getElementById('tab-saved').classList.add('on'); document.getElementById('tab-passed').classList.remove('on'); loadSaved(); }
-  if (id === 's-profile') { renderProfile(); }
+  if (id === 's-discover') { loadSaved(); }
+  if (id === 's-profile')  { renderProfile(); }
 }
 
 function switchTab(tab) {
@@ -1154,14 +1171,10 @@ async function loadSaved() {
 // ══════════════════════════════════════
 function renderSaved() {
   const list      = document.getElementById('saved-list');
-  const sub       = document.getElementById('saved-sub');
-  const title     = document.getElementById('saved-title');
   const clearWrap = document.getElementById('saved-clear-wrap');
 
   if (activeTab === 'saved') {
     const count = savedListings.length;
-    title.textContent = 'Saved apartments';
-    sub.textContent   = `${count} place${count !== 1 ? 's' : ''} you liked`;
     clearWrap.innerHTML = count > 0
       ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>` : '';
 
@@ -1200,8 +1213,6 @@ function renderSaved() {
   } else {
     // Passed tab — we only have keys, not full listing data
     const count = passedKeys.length;
-    title.textContent = 'Passed apartments';
-    sub.textContent   = `${count} place${count !== 1 ? 's' : ''} you passed on`;
     clearWrap.innerHTML = '';
 
     if (count === 0) {
