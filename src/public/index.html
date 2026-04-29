@@ -533,9 +533,81 @@
       padding: 8px 0;
       grid-column: 1 / -1;
     }
+
+    /* ── Photo gallery overlay ── */
+    .gallery-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.96);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .gallery-overlay.open { display: flex; }
+    .gallery-close {
+      position: absolute; top: 16px; right: 20px;
+      font-size: 28px; color: var(--text2); cursor: pointer;
+      line-height: 1; padding: 4px 8px;
+      z-index: 10;
+    }
+    .gallery-close:hover { color: var(--text); }
+    .gallery-counter {
+      position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+      font-size: 13px; color: var(--text3);
+    }
+    .gallery-img-wrap {
+      flex: 1; width: 100%; display: flex; align-items: center; justify-content: center;
+      overflow: hidden; position: relative;
+    }
+    .gallery-img-wrap img {
+      max-width: 100%; max-height: 100%;
+      object-fit: contain;
+      user-select: none; -webkit-user-drag: none;
+    }
+    .gallery-img-wrap .gallery-spinner {
+      position: absolute;
+    }
+    .gallery-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.1); border: none;
+      color: #fff; font-size: 22px; cursor: pointer;
+      padding: 14px 12px; border-radius: 10px;
+      transition: background 0.15s; z-index: 5;
+      line-height: 1;
+    }
+    .gallery-arrow:hover { background: rgba(255,255,255,0.22); }
+    .gallery-arrow.prev { left: 10px; }
+    .gallery-arrow.next { right: 10px; }
+    .gallery-dots {
+      display: flex; gap: 6px; padding: 14px 0 20px;
+      flex-wrap: wrap; justify-content: center; max-width: 200px;
+    }
+    .gallery-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text3); transition: background 0.15s; flex-shrink: 0;
+    }
+    .gallery-dot.on { background: var(--green); }
+    .gallery-loading {
+      color: var(--text3); font-size: 14px; display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+    }
   </style>
 </head>
 <body>
+
+<!-- ════════════════════════════
+     Photo gallery overlay
+════════════════════════════ -->
+<div class="gallery-overlay" id="gallery-overlay">
+  <div class="gallery-close" onclick="closeGallery()">✕</div>
+  <div class="gallery-counter" id="gallery-counter"></div>
+  <div class="gallery-img-wrap" id="gallery-img-wrap">
+    <div class="gallery-loading"><div class="spinner"></div></div>
+  </div>
+  <button class="gallery-arrow prev" id="gallery-prev" onclick="galleryStep(-1)">‹</button>
+  <button class="gallery-arrow next" id="gallery-next" onclick="galleryStep(1)">›</button>
+  <div class="gallery-dots" id="gallery-dots"></div>
+</div>
 
 <!-- ════════════════════════════
      SCREEN — Login
@@ -1172,12 +1244,13 @@ function renderCard() {
     </div>
     <div class="apt-card" id="apt-card">
       <div class="swipe-ov" id="swipe-ov"></div>
-      <div class="apt-photo">
+      <div class="apt-photo" onclick="openGallery()" style="cursor:pointer;">
         🏢
         ${l.image ? `<img src="${esc(l.image)}" alt="listing photo" onerror="this.style.display='none'">` : ''}
         <div class="photo-overlay"></div>
         <div class="badge-avail">New listing</div>
         <div class="badge-source">${esc(l.source || '')}</div>
+        ${l.image ? `<div style="position:absolute;bottom:10px;right:10px;z-index:4;background:rgba(0,0,0,0.55);border-radius:8px;padding:3px 9px;font-size:11px;color:#fff;">⊞ Photos</div>` : ''}
       </div>
       <div class="apt-body">
         <div class="apt-body-left">
@@ -1493,6 +1566,107 @@ function renderProfile() {
     listings.length > 0 ? `${listings.length} listings loaded` : 'No active search';
   syncProfileFields();
   renderNeighborhoodPills('prof-neighborhood-row');
+}
+
+// ══════════════════════════════════════
+//  Photo gallery
+// ══════════════════════════════════════
+let galleryPhotos = [];
+let galleryIdx    = 0;
+let galleryStartX = 0;
+
+async function openGallery() {
+  const l = listings[currentIdx];
+  if (!l) return;
+
+  // Open overlay immediately with spinner
+  const overlay = document.getElementById('gallery-overlay');
+  overlay.classList.add('open');
+  document.getElementById('gallery-img-wrap').innerHTML =
+    '<div class="gallery-loading"><div class="spinner"></div><div style="margin-top:8px;font-size:13px;color:var(--text3);">Loading photos…</div></div>';
+  document.getElementById('gallery-dots').innerHTML = '';
+  document.getElementById('gallery-counter').textContent = '';
+  document.getElementById('gallery-prev').style.display = 'none';
+  document.getElementById('gallery-next').style.display = 'none';
+
+  // Fetch photos
+  galleryPhotos = [];
+  galleryIdx = 0;
+
+  if (l.url && l.url.includes('zillow.com')) {
+    try {
+      const res = await fetch('/api/photos?' + new URLSearchParams({ url: l.url }));
+      if (res.ok) {
+        const data = await res.json();
+        galleryPhotos = data.photos || [];
+      }
+    } catch (_) {}
+  }
+
+  // Fall back to single image if scraping failed
+  if (galleryPhotos.length === 0 && l.image) galleryPhotos = [l.image];
+  if (galleryPhotos.length === 0) {
+    document.getElementById('gallery-img-wrap').innerHTML =
+      '<div style="color:var(--text3);font-size:14px;">No photos available</div>';
+    return;
+  }
+
+  renderGallerySlide();
+  setupGallerySwipe();
+}
+
+function renderGallerySlide() {
+  const total = galleryPhotos.length;
+  const src   = galleryPhotos[galleryIdx];
+
+  document.getElementById('gallery-counter').textContent =
+    total > 1 ? `${galleryIdx + 1} / ${total}` : '';
+
+  const wrap = document.getElementById('gallery-img-wrap');
+  wrap.innerHTML = `<div class="gallery-loading gallery-spinner"><div class="spinner"></div></div>
+    <img src="${esc(src)}" alt="photo ${galleryIdx + 1}"
+      onload="this.previousElementSibling.style.display='none'"
+      onerror="this.previousElementSibling.style.display='none';this.alt='Failed to load'" />`;
+
+  // Arrows
+  document.getElementById('gallery-prev').style.display = (total > 1 && galleryIdx > 0) ? '' : 'none';
+  document.getElementById('gallery-next').style.display = (total > 1 && galleryIdx < total - 1) ? '' : 'none';
+
+  // Dots (only up to 10 shown)
+  const dotsEl = document.getElementById('gallery-dots');
+  if (total > 1 && total <= 30) {
+    dotsEl.innerHTML = Array.from({ length: total }, (_, i) =>
+      `<div class="gallery-dot ${i === galleryIdx ? 'on' : ''}"></div>`
+    ).join('');
+  } else {
+    dotsEl.innerHTML = '';
+  }
+}
+
+function galleryStep(dir) {
+  const total = galleryPhotos.length;
+  galleryIdx = Math.max(0, Math.min(total - 1, galleryIdx + dir));
+  renderGallerySlide();
+}
+
+function closeGallery() {
+  document.getElementById('gallery-overlay').classList.remove('open');
+}
+
+function setupGallerySwipe() {
+  const overlay = document.getElementById('gallery-overlay');
+  overlay.ontouchstart = e => { galleryStartX = e.touches[0].clientX; };
+  overlay.ontouchend   = e => {
+    const dx = e.changedTouches[0].clientX - galleryStartX;
+    if (Math.abs(dx) > 40) galleryStep(dx < 0 ? 1 : -1);
+  };
+  // Keyboard nav
+  document.onkeydown = e => {
+    if (!document.getElementById('gallery-overlay').classList.contains('open')) return;
+    if (e.key === 'ArrowRight') galleryStep(1);
+    if (e.key === 'ArrowLeft')  galleryStep(-1);
+    if (e.key === 'Escape')     closeGallery();
+  };
 }
 
 // ══════════════════════════════════════

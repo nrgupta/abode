@@ -471,6 +471,57 @@ def clear_cache():
     return jsonify({"ok": True})
 
 
+@app.route("/api/photos", methods=["GET"])
+def get_photos():
+    """Scrape all listing photos from a Zillow detail page URL."""
+    uid, err = require_auth()
+    if err:
+        return err
+
+    listing_url = (request.args.get("url") or "").strip()
+    if not listing_url or "zillow.com" not in listing_url:
+        return jsonify({"photos": []})
+
+    import re as _re
+    headers = {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+    }
+    import ssl as _ssl
+    ssl_ctx = _ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = _ssl.CERT_NONE
+
+    try:
+        req = urllib.request.Request(listing_url, headers=headers)
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=15) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        return jsonify({"photos": [], "error": str(e)})
+
+    # Zillow embeds photo URLs in a JSON blob — grab all hdImageUrl / url values
+    photos = []
+    seen = set()
+
+    # Pattern 1: "hdImageUrl":"https://..."
+    for m in _re.finditer(r'"hdImageUrl"\s*:\s*"([^"]+)"', html):
+        url = m.group(1)
+        if url not in seen:
+            seen.add(url)
+            photos.append(url)
+
+    # Pattern 2: "url":"https://photos.zillowstatic.com/..."
+    if not photos:
+        for m in _re.finditer(r'"url"\s*:\s*"(https://photos\.zillowstatic\.com[^"]+)"', html):
+            url = m.group(1)
+            if url not in seen:
+                seen.add(url)
+                photos.append(url)
+
+    return jsonify({"photos": photos})
+
+
 @app.route("/api/lookup", methods=["GET"])
 def lookup_address():
     """Geocode an address then do a tight Zillow search to find a matching listing."""
