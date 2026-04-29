@@ -705,7 +705,7 @@
 
   <!-- Discover / Explore sub-tabs -->
   <div class="disc-tabs">
-    <div class="disc-tab on" id="dtab-discover" onclick="switchDiscoverTab('discover')">Discover</div>
+    <div class="disc-tab on" id="dtab-discover" onclick="switchDiscoverTab('discover')">Search</div>
     <div class="disc-tab"    id="dtab-explore"  onclick="switchDiscoverTab('explore')">Explore</div>
   </div>
 
@@ -720,7 +720,7 @@
   </div>
 
   <!-- Explore view (Google Maps) -->
-  <div id="disc-explore-view" style="display:none;flex:1;flex-direction:column;min-height:0;">
+  <div id="disc-explore-view" style="display:none;flex:1;flex-direction:column;min-height:0;position:relative;">
     <div style="padding:10px 20px;flex-shrink:0;display:flex;gap:8px;">
       <input class="inp" id="explore-search-inp" placeholder="Search address or neighborhood…" style="padding:9px 12px;font-size:14px;border-radius:9px;" onkeydown="if(event.key==='Enter')exploreSearch()" />
       <button class="search-btn" onclick="exploreSearch()">Go</button>
@@ -733,6 +733,14 @@
       referrerpolicy="no-referrer-when-downgrade"
       src="https://maps.google.com/maps?q=Chicago,+IL&output=embed">
     </iframe>
+    <!-- Save button — appears after a search -->
+    <div id="explore-save-bar" style="display:none;position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;">
+      <button onclick="exploreSaveListing()" style="
+        background:var(--green);color:#fff;border:none;border-radius:24px;
+        padding:12px 28px;font-size:15px;font-weight:500;font-family:var(--font);
+        cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.5);white-space:nowrap;
+      ">♡ Save this address</button>
+    </div>
   </div>
 
   <div class="nav">
@@ -1414,11 +1422,37 @@ function renderProfile() {
 // ══════════════════════════════════════
 //  Explore tab
 // ══════════════════════════════════════
+let exploreCurrentQuery = '';
+
 function exploreSearch() {
   const q = (document.getElementById('explore-search-inp').value || '').trim();
   const query = q ? q + ', Chicago, IL' : 'Chicago, IL';
+  exploreCurrentQuery = q;
   document.getElementById('explore-map').src =
     'https://maps.google.com/maps?q=' + encodeURIComponent(query) + '&output=embed';
+  // Show save bar only when an actual address was searched
+  document.getElementById('explore-save-bar').style.display = q ? '' : 'none';
+}
+
+async function exploreSaveListing() {
+  if (!exploreCurrentQuery) return;
+  const btn = document.querySelector('#explore-save-bar button');
+  const listing = {
+    title:    exploreCurrentQuery,
+    location: exploreCurrentQuery,
+    price:    '—',
+    source:   'Explore',
+    url:      'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(exploreCurrentQuery + ', Chicago, IL'),
+  };
+  await saveListing(listing);
+  btn.textContent = '✓ Saved!';
+  btn.style.background = 'var(--bg3)';
+  btn.style.color = 'var(--green-light)';
+  setTimeout(() => {
+    btn.textContent = '♡ Save this address';
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#fff';
+  }, 2000);
 }
 
 // ══════════════════════════════════════
