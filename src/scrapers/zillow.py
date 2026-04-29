@@ -72,28 +72,30 @@ FILTER_DEFAULTS = {
     "isComingSoon":        False,
     "isAuction":           False,
     "isForSaleForeclosure": False,
-    "inUnitLaundry":       True,
-    "parkingAvailable":    True,
 }
 
 
-def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None, min_sqft=None, max_sqft=None, map_bounds=None):
+def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None, min_sqft=None, max_sqft=None, map_bounds=None, laundry=False, parking=False):
     if map_bounds is None:
         map_bounds = DEFAULT_BOUNDS
     filter_state = {
-        "isForRent":                  {"value": True},
-        "isForSaleByAgent":           {"value": FILTER_DEFAULTS["isForSaleByAgent"]},
-        "isForSaleByOwner":           {"value": FILTER_DEFAULTS["isForSaleByOwner"]},
-        "isNewConstruction":          {"value": FILTER_DEFAULTS["isNewConstruction"]},
-        "isComingSoon":               {"value": FILTER_DEFAULTS["isComingSoon"]},
-        "isAuction":                  {"value": FILTER_DEFAULTS["isAuction"]},
-        "isForSaleForeclosure":       {"value": FILTER_DEFAULTS["isForSaleForeclosure"]},
-        "monthlyPayment":             {"min": min_rent, "max": max_rent},
-        "beds":                       {"min": min_beds, "max": max_beds},
-        "baths":                      {"min": min_baths, "max": max_baths},
-        "onlyRentalInUnitLaundry":    {"value": FILTER_DEFAULTS["inUnitLaundry"]},
-        "onlyRentalParkingAvailable": {"value": FILTER_DEFAULTS["parkingAvailable"]},
+        "isForRent":            {"value": True},
+        "isForSaleByAgent":     {"value": False},
+        "isForSaleByOwner":     {"value": False},
+        "isNewConstruction":    {"value": False},
+        "isComingSoon":         {"value": False},
+        "isAuction":            {"value": False},
+        "isForSaleForeclosure": {"value": False},
+        "monthlyPayment":       {"min": min_rent, "max": max_rent},
+        "beds":                 {"min": min_beds, "max": max_beds},
+        "baths":                {"min": min_baths, "max": max_baths},
     }
+
+    # Only add these filters when the user has explicitly requested them
+    if laundry:
+        filter_state["onlyRentalInUnitLaundry"] = {"value": True}
+    if parking:
+        filter_state["onlyRentalParkingAvailable"] = {"value": True}
 
     if min_sqft or max_sqft:
         filter_state["sqft"] = {k: v for k, v in {"min": min_sqft, "max": max_sqft}.items() if v is not None}
@@ -125,6 +127,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
     max_baths = filters.get("maxBaths")
     min_sqft = filters.get("minSqft")
     max_sqft = filters.get("maxSqft")
+    laundry  = filters.get("laundry", False)
+    parking  = filters.get("parking", False)
     neighborhoods = filters.get("neighborhoods", filters.get("neighborhood", "lincoln_park"))
     if isinstance(neighborhoods, str):
         neighborhoods = [neighborhoods]
@@ -149,6 +153,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         min_sqft=min_sqft,
         max_sqft=max_sqft,
         map_bounds=map_bounds,
+        laundry=laundry,
+        parking=parking,
     )
 
     body = json.dumps(payload).encode("utf-8")

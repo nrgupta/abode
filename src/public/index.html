@@ -636,6 +636,17 @@
         </div>
       </div>
       <div class="prow-edit">
+        <div class="label" style="margin-bottom:4px;">Min square footage</div>
+        <input class="inp" type="number" id="prof-minSqft" placeholder="Any" />
+      </div>
+      <div class="prow-edit">
+        <div class="label" style="margin-bottom:4px;">Extras</div>
+        <div class="pill-group">
+          <div class="pill" id="prof-pill-laundry" onclick="toggleProfPill('laundry')">In-unit laundry</div>
+          <div class="pill" id="prof-pill-parking" onclick="toggleProfPill('parking')">Parking</div>
+        </div>
+      </div>
+      <div class="prow-edit">
         <div class="label" style="margin-bottom:4px;">Neighborhoods</div>
         <div class="neighborhood-row" id="prof-neighborhood-row" style="padding:0;border:none;margin-top:2px;">
           <!-- filled by JS -->
@@ -693,6 +704,14 @@
           <option value="2">2 bath</option>
           <option value="3">3 bath</option>
         </select>
+      </div>
+      <div class="discover-field" style="min-width:72px;flex:0.8;">
+        <div class="label">Min sqft</div>
+        <input class="inp" type="number" id="disc-minSqft" placeholder="Any" />
+      </div>
+      <div class="discover-field" style="flex:0 0 auto;align-self:flex-end;display:flex;gap:6px;">
+        <div class="nbhd-pill" id="disc-pill-laundry" onclick="toggleDiscPill('laundry')" title="In-unit laundry">🧺</div>
+        <div class="nbhd-pill" id="disc-pill-parking"  onclick="toggleDiscPill('parking')"  title="Parking">🅿️</div>
       </div>
     </div>
     <button class="search-btn" id="searchBtn" onclick="startSearch()">Search →</button>
@@ -915,8 +934,44 @@ async function doLogout() {
 // ══════════════════════════════════════
 //  Prefs helpers
 // ══════════════════════════════════════
-function savePrefs(maxRent, bedrooms, minBaths) {
-  prefs = { maxRent, bedrooms, minBaths, sources: ['zillow'], neighborhoods: [...selectedNeighborhoods] };
+
+// Toggle state for extras (shared between Discover and Profile)
+let extraFilters = { laundry: false, parking: false };
+
+function toggleDiscPill(key) {
+  extraFilters[key] = !extraFilters[key];
+  _syncPillUI();
+}
+
+function toggleProfPill(key) {
+  extraFilters[key] = !extraFilters[key];
+  _syncPillUI();
+}
+
+function _syncPillUI() {
+  // Discover pills (emoji style)
+  const dp = { laundry: 'disc-pill-laundry', parking: 'disc-pill-parking' };
+  for (const [k, id] of Object.entries(dp)) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', extraFilters[k]);
+  }
+  // Profile pills
+  const pp = { laundry: 'prof-pill-laundry', parking: 'prof-pill-parking' };
+  for (const [k, id] of Object.entries(pp)) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', extraFilters[k]);
+  }
+}
+
+function savePrefs(maxRent, bedrooms, minBaths, minSqft) {
+  prefs = {
+    maxRent, bedrooms, minBaths,
+    minSqft: minSqft || null,
+    laundry: extraFilters.laundry,
+    parking: extraFilters.parking,
+    sources: ['zillow'],
+    neighborhoods: [...selectedNeighborhoods],
+  };
   localStorage.setItem('abode_prefs', JSON.stringify(prefs));
 }
 
@@ -924,8 +979,9 @@ function savePrefsFromProfile() {
   const maxRent  = parseInt(document.getElementById('prof-maxRent').value) || 0;
   const bedrooms = parseInt(document.getElementById('prof-beds').value);
   const minBaths = parseInt(document.getElementById('prof-baths').value);
+  const minSqft  = parseInt(document.getElementById('prof-minSqft').value) || null;
   if (!maxRent) return;
-  savePrefs(maxRent, bedrooms, minBaths);
+  savePrefs(maxRent, bedrooms, minBaths, minSqft);
   // Sync to discover fields too
   syncDiscoverFields();
   // Show confirmation
@@ -939,6 +995,10 @@ function syncDiscoverFields() {
   document.getElementById('disc-maxRent').value = prefs.maxRent;
   document.getElementById('disc-beds').value    = prefs.bedrooms;
   document.getElementById('disc-baths').value   = prefs.minBaths;
+  document.getElementById('disc-minSqft').value = prefs.minSqft || '';
+  if (prefs.laundry !== undefined) extraFilters.laundry = !!prefs.laundry;
+  if (prefs.parking !== undefined) extraFilters.parking = !!prefs.parking;
+  _syncPillUI();
 }
 
 function syncProfileFields() {
@@ -946,6 +1006,10 @@ function syncProfileFields() {
   document.getElementById('prof-maxRent').value = prefs.maxRent;
   document.getElementById('prof-beds').value    = prefs.bedrooms;
   document.getElementById('prof-baths').value   = prefs.minBaths;
+  document.getElementById('prof-minSqft').value = prefs.minSqft || '';
+  if (prefs.laundry !== undefined) extraFilters.laundry = !!prefs.laundry;
+  if (prefs.parking !== undefined) extraFilters.parking = !!prefs.parking;
+  _syncPillUI();
 }
 
 // ══════════════════════════════════════
@@ -993,6 +1057,7 @@ async function startSearch() {
   const maxRent  = parseInt(document.getElementById('disc-maxRent').value) || 0;
   const bedrooms = parseInt(document.getElementById('disc-beds').value);
   const minBaths = parseInt(document.getElementById('disc-baths').value);
+  const minSqft  = parseInt(document.getElementById('disc-minSqft').value) || null;
 
   const errEl = document.getElementById('discover-error');
   if (!maxRent) {
@@ -1002,7 +1067,7 @@ async function startSearch() {
   errEl.innerHTML = '';
 
   // Save prefs whenever a search is run
-  savePrefs(maxRent, bedrooms, minBaths);
+  savePrefs(maxRent, bedrooms, minBaths, minSqft);
   syncProfileFields();
 
   const btn = document.getElementById('searchBtn');
@@ -1015,7 +1080,13 @@ async function startSearch() {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources: ['zillow'], bedrooms, minBaths, maxRent, neighborhoods: [...selectedNeighborhoods] }),
+      body: JSON.stringify({
+        sources: ['zillow'], bedrooms, minBaths, maxRent,
+        minSqft,
+        laundry: extraFilters.laundry || false,
+        parking: extraFilters.parking || false,
+        neighborhoods: [...selectedNeighborhoods],
+      }),
     });
     if (res.status === 401) { goTo('s-login'); return; }
     if (!res.ok) throw new Error(`Server error ${res.status}`);

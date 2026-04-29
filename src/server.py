@@ -310,6 +310,9 @@ def search():
     min_baths    = data.get("minBaths")
     max_rent     = data.get("maxRent")
     min_rent     = data.get("minRent", 0)
+    min_sqft     = data.get("minSqft")
+    laundry      = bool(data.get("laundry", False))
+    parking      = bool(data.get("parking", False))
     neighborhoods = data.get("neighborhoods", ["lincoln_park"])
     if isinstance(neighborhoods, str):
         neighborhoods = [neighborhoods]
@@ -322,6 +325,9 @@ def search():
         "minRent":        int(min_rent),
         "bedrooms":       int(bedrooms),
         "minBaths":       int(min_baths) if min_baths else None,
+        "minSqft":        int(min_sqft) if min_sqft else None,
+        "laundry":        laundry,
+        "parking":        parking,
         "neighborhoods":  neighborhoods,
     }
 
