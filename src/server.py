@@ -18,6 +18,7 @@ from flask import Flask, jsonify, request, send_from_directory, session
 load_dotenv()
 
 from agent.listingsTool import run_agent
+from scrapers.zillow import NEIGHBORHOOD_BOUNDS
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "public"))
 
@@ -304,20 +305,22 @@ def search():
 
     data = request.get_json(force=True) or {}
 
-    sources   = ["zillow"]
-    bedrooms  = data.get("bedrooms")
-    min_baths = data.get("minBaths")
-    max_rent  = data.get("maxRent")
-    min_rent  = data.get("minRent", 0)
+    sources      = ["zillow"]
+    bedrooms     = data.get("bedrooms")
+    min_baths    = data.get("minBaths")
+    max_rent     = data.get("maxRent")
+    min_rent     = data.get("minRent", 0)
+    neighborhood = data.get("neighborhood", "lincoln_park")
 
     if not max_rent or not bedrooms:
         return jsonify({"error": "bedrooms and maxRent are required"}), 400
 
     filters = {
-        "maxRent":  int(max_rent),
-        "minRent":  int(min_rent),
-        "bedrooms": int(bedrooms),
-        "minBaths": int(min_baths) if min_baths else None,
+        "maxRent":      int(max_rent),
+        "minRent":      int(min_rent),
+        "bedrooms":     int(bedrooms),
+        "minBaths":     int(min_baths) if min_baths else None,
+        "neighborhood": neighborhood,
     }
 
     # Return cached results if fresh enough
@@ -433,6 +436,25 @@ def get_passed():
         return err
     keys = load_passed_keys(uid)
     return jsonify({"keys": keys})
+
+
+@app.route("/api/neighborhoods", methods=["GET"])
+def get_neighborhoods():
+    labels = {
+        "all":           "All Chicago",
+        "lincoln_park":  "Lincoln Park",
+        "wicker_park":   "Wicker Park",
+        "river_north":   "River North",
+        "west_loop":     "West Loop",
+        "logan_square":  "Logan Square",
+        "lakeview":      "Lakeview",
+        "streeterville": "Streeterville",
+        "south_loop":    "South Loop",
+        "bucktown":      "Bucktown",
+        "old_town":      "Old Town",
+        "andersonville": "Andersonville",
+    }
+    return jsonify([{"key": k, "label": labels.get(k, k)} for k in NEIGHBORHOOD_BOUNDS])
 
 
 @app.route("/api/cache/clear", methods=["POST"])

@@ -185,10 +185,38 @@
     .discover-setup {
       padding: 12px 20px 10px;
       flex-shrink: 0;
-      border-bottom: 0.5px solid var(--border);
       display: flex;
       gap: 10px;
       align-items: flex-end;
+    }
+    .neighborhood-row {
+      padding: 0 20px 10px;
+      flex-shrink: 0;
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      border-bottom: 0.5px solid var(--border);
+      scrollbar-width: none;
+    }
+    .neighborhood-row::-webkit-scrollbar { display: none; }
+    .nbhd-pill {
+      padding: 5px 13px;
+      border-radius: 20px;
+      font-size: 12px;
+      border: 0.5px solid var(--border2);
+      background: var(--bg2);
+      color: var(--text2);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .nbhd-pill.on {
+      background: var(--green-dim);
+      border-color: var(--green);
+      color: var(--green-light);
+      font-weight: 500;
     }
     .discover-setup-fields {
       flex: 1;
@@ -664,6 +692,11 @@
     <button class="search-btn" id="searchBtn" onclick="startSearch()">Search →</button>
   </div>
 
+  <!-- Neighborhood picker -->
+  <div class="neighborhood-row" id="neighborhood-row">
+    <!-- filled by JS -->
+  </div>
+
   <!-- Discover / Saved / Passed sub-tabs -->
   <div class="disc-tabs">
     <div class="disc-tab on" id="dtab-discover" onclick="switchDiscoverTab('discover')">Discover</div>
@@ -731,6 +764,9 @@ let activeTab     = 'saved';
 let seenKeys = new Set(JSON.parse(localStorage.getItem('abode_seen') || '[]'));
 // Amenities cache: listingKey → { data } | { promise } | null
 let amenitiesCache = {};
+// Neighborhoods
+let neighborhoods = [];
+let selectedNeighborhood = (prefs && prefs.neighborhood) || 'lincoln_park';
 
 // ══════════════════════════════════════
 //  Navigation
@@ -842,7 +878,7 @@ async function doLogout() {
 //  Prefs helpers
 // ══════════════════════════════════════
 function savePrefs(maxRent, bedrooms, minBaths) {
-  prefs = { maxRent, bedrooms, minBaths, sources: ['zillow'] };
+  prefs = { maxRent, bedrooms, minBaths, sources: ['zillow'], neighborhood: selectedNeighborhood };
   localStorage.setItem('abode_prefs', JSON.stringify(prefs));
 }
 
@@ -875,6 +911,36 @@ function syncProfileFields() {
 }
 
 // ══════════════════════════════════════
+//  Neighborhood picker
+// ══════════════════════════════════════
+async function loadNeighborhoods() {
+  try {
+    const res = await fetch('/api/neighborhoods');
+    if (!res.ok) return;
+    neighborhoods = await res.json();
+    renderNeighborhoodPills();
+  } catch (_) {}
+}
+
+function renderNeighborhoodPills() {
+  const row = document.getElementById('neighborhood-row');
+  if (!row) return;
+  row.innerHTML = neighborhoods.map(n => `
+    <div class="nbhd-pill ${n.key === selectedNeighborhood ? 'on' : ''}"
+         onclick="selectNeighborhood('${n.key}')">${esc(n.label)}</div>
+  `).join('');
+}
+
+function selectNeighborhood(key) {
+  selectedNeighborhood = key;
+  renderNeighborhoodPills();
+  if (prefs) {
+    prefs.neighborhood = key;
+    localStorage.setItem('abode_prefs', JSON.stringify(prefs));
+  }
+}
+
+// ══════════════════════════════════════
 //  Search
 // ══════════════════════════════════════
 async function startSearch() {
@@ -903,7 +969,7 @@ async function startSearch() {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources: ['zillow'], bedrooms, minBaths, maxRent }),
+      body: JSON.stringify({ sources: ['zillow'], bedrooms, minBaths, maxRent, neighborhood: selectedNeighborhood }),
     });
     if (res.status === 401) { goTo('s-login'); return; }
     if (!res.ok) throw new Error(`Server error ${res.status}`);
@@ -1322,7 +1388,9 @@ function esc(str) {
   if (prefs) {
     syncDiscoverFields();
     syncProfileFields();
+    if (prefs.neighborhood) selectedNeighborhood = prefs.neighborhood;
   }
+  loadNeighborhoods();
 
   try {
     const res  = await fetch('/api/me');

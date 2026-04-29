@@ -6,18 +6,64 @@ from datetime import datetime, timezone
 
 ZILLOW_API_URL = "https://www.zillow.com/async-create-search-page-state"
 
-# Ideal Living Area bounding box
-MAP_BOUNDS = {
-    "west":  -87.68248435944328,
-    "east":  -87.61708137482414,
-    "south": 41.90064568672503,
-    "north": 41.944582838604454,
-}
-
-MAP_ZOOM = 12
+MAP_ZOOM = 13
 
 # Region: Chicago, IL (regionId 17426, regionType 6)
 REGION_SELECTION = [{"regionId": 17426, "regionType": 6}]
+
+# Bounding boxes for Chicago neighborhoods
+NEIGHBORHOOD_BOUNDS = {
+    "all": {
+        "west": -87.94011, "east": -87.52414,
+        "south": 41.64454, "north": 42.02304,
+    },
+    "lincoln_park": {
+        "west": -87.6637, "east": -87.6330,
+        "south": 41.9107, "north": 41.9391,
+    },
+    "wicker_park": {
+        "west": -87.6820, "east": -87.6530,
+        "south": 41.8940, "north": 41.9120,
+    },
+    "river_north": {
+        "west": -87.6450, "east": -87.6230,
+        "south": 41.8880, "north": 41.9030,
+    },
+    "west_loop": {
+        "west": -87.6620, "east": -87.6370,
+        "south": 41.8780, "north": 41.8930,
+    },
+    "logan_square": {
+        "west": -87.7100, "east": -87.6720,
+        "south": 41.9180, "north": 41.9380,
+    },
+    "lakeview": {
+        "west": -87.6700, "east": -87.6330,
+        "south": 41.9280, "north": 41.9580,
+    },
+    "streeterville": {
+        "west": -87.6270, "east": -87.6100,
+        "south": 41.8880, "north": 41.9030,
+    },
+    "south_loop": {
+        "west": -87.6380, "east": -87.6150,
+        "south": 41.8620, "north": 41.8800,
+    },
+    "bucktown": {
+        "west": -87.6850, "east": -87.6580,
+        "south": 41.9120, "north": 41.9280,
+    },
+    "old_town": {
+        "west": -87.6430, "east": -87.6260,
+        "south": 41.9030, "north": 41.9180,
+    },
+    "andersonville": {
+        "west": -87.6680, "east": -87.6480,
+        "south": 41.9750, "north": 41.9950,
+    },
+}
+
+DEFAULT_BOUNDS = NEIGHBORHOOD_BOUNDS["lincoln_park"]
 
 FILTER_DEFAULTS = {
     "isForSaleByAgent":    False,
@@ -31,7 +77,9 @@ FILTER_DEFAULTS = {
 }
 
 
-def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None, min_sqft=None, max_sqft=None):
+def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=None, max_baths=None, min_sqft=None, max_sqft=None, map_bounds=None):
+    if map_bounds is None:
+        map_bounds = DEFAULT_BOUNDS
     filter_state = {
         "isForRent":                  {"value": True},
         "isForSaleByAgent":           {"value": FILTER_DEFAULTS["isForSaleByAgent"]},
@@ -54,7 +102,7 @@ def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=
         "searchQueryState": {
             "pagination": {},
             "isMapVisible": True,
-            "mapBounds": MAP_BOUNDS,
+            "mapBounds": map_bounds,
             "mapZoom": MAP_ZOOM,
             "regionSelection": REGION_SELECTION,
             "filterState": filter_state,
@@ -77,6 +125,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
     max_baths = filters.get("maxBaths")
     min_sqft = filters.get("minSqft")
     max_sqft = filters.get("maxSqft")
+    neighborhood = filters.get("neighborhood", "lincoln_park")
+    map_bounds = NEIGHBORHOOD_BOUNDS.get(neighborhood, DEFAULT_BOUNDS)
 
     payload = build_payload(
         max_rent=max_rent,
@@ -87,6 +137,7 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         max_baths=max_baths,
         min_sqft=min_sqft,
         max_sqft=max_sqft,
+        map_bounds=map_bounds,
     )
 
     body = json.dumps(payload).encode("utf-8")
