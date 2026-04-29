@@ -183,7 +183,7 @@
     #s-discover { overflow: hidden; }
 
     .discover-setup {
-      padding: 12px 20px 10px;
+      padding: 16px 20px 14px;
       flex-shrink: 0;
       display: flex;
       gap: 10px;
@@ -710,8 +710,8 @@
         <input class="inp" type="number" id="disc-minSqft" placeholder="Any" />
       </div>
       <div class="discover-field" style="flex:0 0 auto;align-self:flex-end;display:flex;gap:6px;">
-        <div class="nbhd-pill" id="disc-pill-laundry" onclick="toggleDiscPill('laundry')" title="In-unit laundry">🧺</div>
-        <div class="nbhd-pill" id="disc-pill-parking"  onclick="toggleDiscPill('parking')"  title="Parking">🅿️</div>
+        <div class="nbhd-pill" id="disc-pill-laundry" onclick="toggleDiscPill('laundry')">In-unit laundry</div>
+        <div class="nbhd-pill" id="disc-pill-parking"  onclick="toggleDiscPill('parking')">Parking</div>
       </div>
     </div>
     <button class="search-btn" id="searchBtn" onclick="startSearch()">Search →</button>
@@ -1028,7 +1028,12 @@ async function loadNeighborhoods() {
 function renderNeighborhoodPills(containerId = 'neighborhood-row') {
   const row = document.getElementById(containerId);
   if (!row) return;
-  row.innerHTML = neighborhoods.map(n => `
+  // Discover row: only show selected neighborhoods (no deselect UI — edit in Profile)
+  const isDiscover = containerId === 'neighborhood-row';
+  const list = isDiscover
+    ? neighborhoods.filter(n => selectedNeighborhoods.has(n.key))
+    : neighborhoods;
+  row.innerHTML = list.map(n => `
     <div class="nbhd-pill ${selectedNeighborhoods.has(n.key) ? 'on' : ''}"
          onclick="toggleNeighborhood('${n.key}', '${containerId}')">${esc(n.label)}</div>
   `).join('');
