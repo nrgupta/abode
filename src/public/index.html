@@ -635,6 +635,12 @@
           </div>
         </div>
       </div>
+      <div class="prow-edit">
+        <div class="label" style="margin-bottom:4px;">Neighborhoods</div>
+        <div class="neighborhood-row" id="prof-neighborhood-row" style="padding:0;border:none;margin-top:2px;">
+          <!-- filled by JS -->
+        </div>
+      </div>
       <div style="padding-top: 12px;">
         <button class="cta" onclick="savePrefsFromProfile()">Save criteria</button>
       </div>
@@ -652,7 +658,7 @@
   <div class="nav">
     <div class="nav-item on"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Saved</div></div>
   </div>
 </div>
 
@@ -697,11 +703,10 @@
     <!-- filled by JS -->
   </div>
 
-  <!-- Discover / Saved / Passed sub-tabs -->
+  <!-- Discover / Explore sub-tabs -->
   <div class="disc-tabs">
     <div class="disc-tab on" id="dtab-discover" onclick="switchDiscoverTab('discover')">Discover</div>
-    <div class="disc-tab"    id="dtab-saved"    onclick="switchDiscoverTab('saved')">Saved</div>
-    <div class="disc-tab"    id="dtab-passed"   onclick="switchDiscoverTab('passed')">Passed</div>
+    <div class="disc-tab"    id="dtab-explore"  onclick="switchDiscoverTab('explore')">Explore</div>
   </div>
 
   <div id="discover-error" style="padding: 0 20px;"></div>
@@ -714,37 +719,53 @@
     </div>
   </div>
 
-  <!-- Saved / Passed list view (hidden by default) -->
-  <div id="disc-list-view" style="display:none;flex:1;flex-direction:column;overflow-y:auto;min-height:0;">
-    <div class="saved-list" id="saved-list"></div>
-    <div style="padding: 12px 24px 0; flex-shrink: 0;" id="saved-clear-wrap"></div>
+  <!-- Explore view (Google Maps) -->
+  <div id="disc-explore-view" style="display:none;flex:1;flex-direction:column;min-height:0;">
+    <div style="padding:10px 20px;flex-shrink:0;display:flex;gap:8px;">
+      <input class="inp" id="explore-search-inp" placeholder="Search address or neighborhood…" style="padding:9px 12px;font-size:14px;border-radius:9px;" onkeydown="if(event.key==='Enter')exploreSearch()" />
+      <button class="search-btn" onclick="exploreSearch()">Go</button>
+    </div>
+    <iframe
+      id="explore-map"
+      style="flex:1;border:none;width:100%;min-height:0;"
+      loading="lazy"
+      allowfullscreen
+      referrerpolicy="no-referrer-when-downgrade"
+      src="https://maps.google.com/maps?q=Chicago,+IL&output=embed">
+    </iframe>
   </div>
 
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item on"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Saved</div></div>
   </div>
 </div>
 
 <!-- ════════════════════════════
-     SCREEN — Listing Agent
+     SCREEN — Saved / Passed
 ════════════════════════════ -->
 <div class="screen" id="s-agent">
   <div class="top-bar">
     <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
   </div>
-  <div class="content" style="justify-content:center;align-items:center;flex:1;">
-    <div class="empty-state">
-      <div class="empty-icon">✦</div>
-      <div style="color:var(--text2);font-size:16px;">Listing Agent</div>
-      <div style="color:var(--text3);font-size:13px;">Coming soon</div>
-    </div>
+
+  <!-- Saved / Passed tabs -->
+  <div class="tab-bar">
+    <div class="tab on" id="atab-saved"  onclick="switchAgentTab('saved')">Saved</div>
+    <div class="tab"    id="atab-passed" onclick="switchAgentTab('passed')">Passed</div>
   </div>
+
+  <!-- List -->
+  <div style="flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;">
+    <div class="saved-list" id="agent-saved-list"></div>
+    <div style="padding: 12px 24px 0; flex-shrink: 0;" id="agent-saved-clear-wrap"></div>
+  </div>
+
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item on"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+    <div class="nav-item on"><div class="nav-icon">✦</div><div class="nav-lbl">Saved</div></div>
   </div>
 </div>
 
@@ -759,14 +780,14 @@ let stats         = JSON.parse(localStorage.getItem('abode_stats') || '{"viewed"
 let currentUser   = null;
 let savedListings = [];
 let passedKeys    = [];   // just keys — we don't store full passed listing data
-let activeTab     = 'saved';
+
 // Keys of listings the user has already acted on (saved or passed) this session
 let seenKeys = new Set(JSON.parse(localStorage.getItem('abode_seen') || '[]'));
 // Amenities cache: listingKey → { data } | { promise } | null
 let amenitiesCache = {};
 // Neighborhoods
 let neighborhoods = [];
-let selectedNeighborhood = (prefs && prefs.neighborhood) || 'lincoln_park';
+let selectedNeighborhoods = new Set((prefs && prefs.neighborhoods) || ['lincoln_park']);
 
 // ══════════════════════════════════════
 //  Navigation
@@ -774,31 +795,40 @@ let selectedNeighborhood = (prefs && prefs.neighborhood) || 'lincoln_park';
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 's-discover') { loadSaved(); switchDiscoverTab('discover'); }
+  if (id === 's-discover') { switchDiscoverTab('discover'); }
   if (id === 's-profile')  { renderProfile(); }
+  if (id === 's-agent')    { loadSavedForAgent(); }
 }
 
-let discoverTab = 'discover'; // 'discover' | 'saved' | 'passed'
+let discoverTab = 'discover'; // 'discover' | 'explore'
 
 function switchDiscoverTab(tab) {
   discoverTab = tab;
-  ['discover','saved','passed'].forEach(t => {
+  ['discover','explore'].forEach(t => {
     document.getElementById('dtab-' + t).classList.toggle('on', t === tab);
   });
-  const swipeArea  = document.getElementById('swipe-area');
-  const listView   = document.getElementById('disc-list-view');
-  const errEl      = document.getElementById('discover-error');
+  const swipeArea   = document.getElementById('swipe-area');
+  const exploreView = document.getElementById('disc-explore-view');
+  const errEl       = document.getElementById('discover-error');
   if (tab === 'discover') {
-    swipeArea.style.display = '';
-    listView.style.display  = 'none';
-    errEl.style.display     = '';
+    swipeArea.style.display   = '';
+    exploreView.style.display = 'none';
+    errEl.style.display       = '';
   } else {
-    swipeArea.style.display = 'none';
-    listView.style.display  = 'flex';
-    errEl.style.display     = 'none';
-    activeTab = tab;
-    renderSaved();
+    swipeArea.style.display   = 'none';
+    exploreView.style.display = 'flex';
+    errEl.style.display       = 'none';
   }
+}
+
+let agentTab = 'saved'; // 'saved' | 'passed'
+
+function switchAgentTab(tab) {
+  agentTab = tab;
+  ['saved','passed'].forEach(t => {
+    document.getElementById('atab-' + t).classList.toggle('on', t === tab);
+  });
+  renderAgentList();
 }
 
 // ══════════════════════════════════════
@@ -878,7 +908,7 @@ async function doLogout() {
 //  Prefs helpers
 // ══════════════════════════════════════
 function savePrefs(maxRent, bedrooms, minBaths) {
-  prefs = { maxRent, bedrooms, minBaths, sources: ['zillow'], neighborhood: selectedNeighborhood };
+  prefs = { maxRent, bedrooms, minBaths, sources: ['zillow'], neighborhoods: [...selectedNeighborhoods] };
   localStorage.setItem('abode_prefs', JSON.stringify(prefs));
 }
 
@@ -918,24 +948,32 @@ async function loadNeighborhoods() {
     const res = await fetch('/api/neighborhoods');
     if (!res.ok) return;
     neighborhoods = await res.json();
-    renderNeighborhoodPills();
+    renderNeighborhoodPills('neighborhood-row');
+    renderNeighborhoodPills('prof-neighborhood-row');
   } catch (_) {}
 }
 
-function renderNeighborhoodPills() {
-  const row = document.getElementById('neighborhood-row');
+function renderNeighborhoodPills(containerId = 'neighborhood-row') {
+  const row = document.getElementById(containerId);
   if (!row) return;
   row.innerHTML = neighborhoods.map(n => `
-    <div class="nbhd-pill ${n.key === selectedNeighborhood ? 'on' : ''}"
-         onclick="selectNeighborhood('${n.key}')">${esc(n.label)}</div>
+    <div class="nbhd-pill ${selectedNeighborhoods.has(n.key) ? 'on' : ''}"
+         onclick="toggleNeighborhood('${n.key}', '${containerId}')">${esc(n.label)}</div>
   `).join('');
 }
 
-function selectNeighborhood(key) {
-  selectedNeighborhood = key;
-  renderNeighborhoodPills();
+function toggleNeighborhood(key, containerId) {
+  if (selectedNeighborhoods.has(key)) {
+    // Don't allow deselecting all
+    if (selectedNeighborhoods.size > 1) selectedNeighborhoods.delete(key);
+  } else {
+    selectedNeighborhoods.add(key);
+  }
+  // Re-render both pill rows if they exist
+  renderNeighborhoodPills('neighborhood-row');
+  renderNeighborhoodPills('prof-neighborhood-row');
   if (prefs) {
-    prefs.neighborhood = key;
+    prefs.neighborhoods = [...selectedNeighborhoods];
     localStorage.setItem('abode_prefs', JSON.stringify(prefs));
   }
 }
@@ -969,7 +1007,7 @@ async function startSearch() {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources: ['zillow'], bedrooms, minBaths, maxRent, neighborhood: selectedNeighborhood }),
+      body: JSON.stringify({ sources: ['zillow'], bedrooms, minBaths, maxRent, neighborhoods: [...selectedNeighborhoods] }),
     });
     if (res.status === 401) { goTo('s-login'); return; }
     if (!res.ok) throw new Error(`Server error ${res.status}`);
@@ -1249,28 +1287,29 @@ async function unsaveListing(key) {
   try {
     await fetch('/api/save', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
   } catch (_) {}
-  renderSaved();
+  renderAgentList();
   renderProfile();
 }
 
-async function loadSaved() {
+async function loadSavedForAgent() {
   try {
     const [sr, pr] = await Promise.all([fetch('/api/saved'), fetch('/api/passed')]);
     if (sr.status === 401) { goTo('s-login'); return; }
     if (sr.ok) savedListings = (await sr.json()).listings || [];
     if (pr.ok) passedKeys    = (await pr.json()).keys || [];
   } catch (_) {}
-  renderSaved();
+  renderAgentList();
 }
 
 // ══════════════════════════════════════
-//  Saved screen
+//  Agent screen (Saved / Passed)
 // ══════════════════════════════════════
-function renderSaved() {
-  const list      = document.getElementById('saved-list');
-  const clearWrap = document.getElementById('saved-clear-wrap');
+function renderAgentList() {
+  const list      = document.getElementById('agent-saved-list');
+  const clearWrap = document.getElementById('agent-saved-clear-wrap');
+  if (!list) return;
 
-  if (activeTab === 'saved') {
+  if (agentTab === 'saved') {
     const count = savedListings.length;
     clearWrap.innerHTML = count > 0
       ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>` : '';
@@ -1347,14 +1386,14 @@ async function reconsiderListing(key) {
       body: JSON.stringify({ key }),
     });
   } catch (_) {}
-  renderSaved();
+  renderAgentList();
 }
 
 async function clearAllSaved() {
   if (!confirm('Remove all saved apartments?')) return;
   savedListings = [];
   try { await fetch('/api/save/clear', { method: 'POST' }); } catch (_) {}
-  renderSaved();
+  renderAgentList();
   renderProfile();
 }
 
@@ -1369,6 +1408,17 @@ function renderProfile() {
   document.getElementById('prof-status').textContent      =
     listings.length > 0 ? `${listings.length} listings loaded` : 'No active search';
   syncProfileFields();
+  renderNeighborhoodPills('prof-neighborhood-row');
+}
+
+// ══════════════════════════════════════
+//  Explore tab
+// ══════════════════════════════════════
+function exploreSearch() {
+  const q = (document.getElementById('explore-search-inp').value || '').trim();
+  const query = q ? q + ', Chicago, IL' : 'Chicago, IL';
+  document.getElementById('explore-map').src =
+    'https://maps.google.com/maps?q=' + encodeURIComponent(query) + '&output=embed';
 }
 
 // ══════════════════════════════════════
@@ -1388,7 +1438,7 @@ function esc(str) {
   if (prefs) {
     syncDiscoverFields();
     syncProfileFields();
-    if (prefs.neighborhood) selectedNeighborhood = prefs.neighborhood;
+    if (prefs.neighborhoods) selectedNeighborhoods = new Set(prefs.neighborhoods);
   }
   loadNeighborhoods();
 

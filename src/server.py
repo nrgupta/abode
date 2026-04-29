@@ -310,17 +310,19 @@ def search():
     min_baths    = data.get("minBaths")
     max_rent     = data.get("maxRent")
     min_rent     = data.get("minRent", 0)
-    neighborhood = data.get("neighborhood", "lincoln_park")
+    neighborhoods = data.get("neighborhoods", ["lincoln_park"])
+    if isinstance(neighborhoods, str):
+        neighborhoods = [neighborhoods]
 
     if not max_rent or not bedrooms:
         return jsonify({"error": "bedrooms and maxRent are required"}), 400
 
     filters = {
-        "maxRent":      int(max_rent),
-        "minRent":      int(min_rent),
-        "bedrooms":     int(bedrooms),
-        "minBaths":     int(min_baths) if min_baths else None,
-        "neighborhood": neighborhood,
+        "maxRent":        int(max_rent),
+        "minRent":        int(min_rent),
+        "bedrooms":       int(bedrooms),
+        "minBaths":       int(min_baths) if min_baths else None,
+        "neighborhoods":  neighborhoods,
     }
 
     # Return cached results if fresh enough

@@ -125,8 +125,19 @@ async def scrape_zillow(filters: dict) -> list[dict]:
     max_baths = filters.get("maxBaths")
     min_sqft = filters.get("minSqft")
     max_sqft = filters.get("maxSqft")
-    neighborhood = filters.get("neighborhood", "lincoln_park")
-    map_bounds = NEIGHBORHOOD_BOUNDS.get(neighborhood, DEFAULT_BOUNDS)
+    neighborhoods = filters.get("neighborhoods", filters.get("neighborhood", "lincoln_park"))
+    if isinstance(neighborhoods, str):
+        neighborhoods = [neighborhoods]
+    # Merge bounding boxes of all selected neighborhoods
+    selected_bounds = [NEIGHBORHOOD_BOUNDS[n] for n in neighborhoods if n in NEIGHBORHOOD_BOUNDS]
+    if not selected_bounds:
+        selected_bounds = [DEFAULT_BOUNDS]
+    map_bounds = {
+        "west":  min(b["west"]  for b in selected_bounds),
+        "east":  max(b["east"]  for b in selected_bounds),
+        "south": min(b["south"] for b in selected_bounds),
+        "north": max(b["north"] for b in selected_bounds),
+    }
 
     payload = build_payload(
         max_rent=max_rent,
