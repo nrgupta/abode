@@ -465,6 +465,99 @@ def clear_cache():
     return jsonify({"ok": True})
 
 
+@app.route("/api/lookup", methods=["GET"])
+def lookup_address():
+    """Geocode an address then do a tight Zillow search to find a matching listing."""
+    uid, err = require_auth()
+    if err:
+        return err
+
+    address = (request.args.get("address") or "").strip()
+    if not address:
+        return jsonify({"error": "address param required"}), 400
+
+    # Geocode to get lat/lng
+    if "chicago" not in address.lower():
+        address_hint = address + ", Chicago, IL"
+    else:
+        address_hint = address
+    coords = _geocode(address_hint)
+    if not coords:
+        return jsonify({"listing": None})
+
+    lat, lng = coords
+    # Build a tight ~400m bounding box around the geocoded point
+    delta = 0.003  # ~330m
+    map_bounds = {
+        "west":  lng - delta,
+        "east":  lng + delta,
+        "south": lat - delta,
+        "north": lat + delta,
+    }
+
+    import asyncio as _asyncio
+    from scrapers.zillow import build_payload, ZILLOW_API_URL
+    import ssl as _ssl, json as _json, urllib.request as _urlreq
+
+    payload = build_payload(max_rent=999999, min_rent=0, map_bounds=map_bounds)
+    body = _json.dumps(payload).encode("utf-8")
+    req = _urlreq.Request(
+        ZILLOW_API_URL, data=body, method="PUT",
+        headers={
+            "accept": "*/*", "accept-language": "en-US,en;q=0.9",
+            "content-type": "application/json", "content-length": str(len(body)),
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+        },
+    )
+    ssl_ctx = _ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = _ssl.CERT_NONE
+
+    try:
+        with _urlreq.urlopen(req, context=ssl_ctx) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return jsonify({"listing": None})
+
+    import re as _re
+    from datetime import datetime as _dt, timezone as _tz
+    results = (data.get("cat1") or {}).get("searchResults", {}).get("mapResults", [])
+    best = None
+    q_lower = address.lower()
+    for r in results:
+        addr = (r.get("address") or "").lower()
+        # Prefer exact street number match
+        if q_lower.split()[0] in addr:
+            best = r
+            break
+    if not best and results:
+        best = results[0]
+
+    if not best:
+        return jsonify({"listing": None})
+
+    price_raw = best.get("price") or best.get("unformattedPrice") or ""
+    numeric_price = _re.sub(r"\D", "", str(price_raw))
+    listing = {
+        "title":     best.get("address", address),
+        "price":     f"${numeric_price}/mo" if numeric_price else "—",
+        "location":  best.get("address", address),
+        "url":       f"https://www.zillow.com{best.get('detailUrl', '')}",
+        "beds":      best.get("minBeds", ""),
+        "baths":     best.get("minBaths", ""),
+        "sqft":      best.get("minArea", ""),
+        "image":     best.get("imgSrc", ""),
+        "source":    "Zillow",
+        "scrapedAt": _dt.now(_tz.utc).isoformat(),
+    }
+    lat2 = (best.get("latLong") or {}).get("latitude")
+    lng2 = (best.get("latLong") or {}).get("longitude")
+    if lat2 and lng2:
+        listing["lat"] = lat2
+        listing["lng"] = lng2
+    return jsonify({"listing": listing})
+
+
 # ── Amenities (OpenStreetMap — free, no API key) ──────────────────────────────
 
 _OSM_HEADERS = {"User-Agent": "Abode/1.0 (apartment search app)"}

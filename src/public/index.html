@@ -1437,13 +1437,29 @@ function exploreSearch() {
 async function exploreSaveListing() {
   if (!exploreCurrentQuery) return;
   const btn = document.querySelector('#explore-save-bar button');
-  const listing = {
-    title:    exploreCurrentQuery,
-    location: exploreCurrentQuery,
-    price:    '—',
-    source:   'Explore',
-    url:      'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(exploreCurrentQuery + ', Chicago, IL'),
-  };
+  btn.disabled = true;
+  btn.textContent = 'Looking up on Zillow…';
+
+  let listing = null;
+  try {
+    const res = await fetch('/api/lookup?' + new URLSearchParams({ address: exploreCurrentQuery }));
+    if (res.ok) {
+      const data = await res.json();
+      if (data.listing) listing = data.listing;
+    }
+  } catch (_) {}
+
+  // Fall back to a plain address card if Zillow had no match
+  if (!listing) {
+    listing = {
+      title:    exploreCurrentQuery,
+      location: exploreCurrentQuery,
+      price:    '—',
+      source:   'Explore',
+      url:      'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(exploreCurrentQuery + ', Chicago, IL'),
+    };
+  }
+
   await saveListing(listing);
   btn.textContent = '✓ Saved!';
   btn.style.background = 'var(--bg3)';
@@ -1452,6 +1468,7 @@ async function exploreSaveListing() {
     btn.textContent = '♡ Save this address';
     btn.style.background = 'var(--green)';
     btn.style.color = '#fff';
+    btn.disabled = false;
   }, 2000);
 }
 
