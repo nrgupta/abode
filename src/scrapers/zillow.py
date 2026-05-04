@@ -111,7 +111,7 @@ def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=
             "isListVisible": True,
         },
         "wants": {
-            "cat1": ["mapResults"],
+            "cat1": ["mapResults", "listResults"],
         },
         "requestId": 2,
         "isDebugRequest": False,
@@ -186,7 +186,23 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         print(f"Zillow request error: {e}")
         return []
 
-    results = (data.get("cat1") or {}).get("searchResults", {}).get("mapResults", [])
+    cat1          = data.get("cat1") or {}
+    search_results = cat1.get("searchResults", {})
+    results = search_results.get("mapResults", [])
+
+    # Build zpid → photos map from listResults (which has carouselPhotosComposable)
+    photo_map: dict[str, list[str]] = {}
+    for lr in search_results.get("listResults", []):
+        zpid = str(lr.get("zpid", ""))
+        cpc = lr.get("carouselPhotosComposable") or {}
+        base_url = cpc.get("baseUrl", "")
+        photo_data = cpc.get("photoData") or []
+        if base_url and photo_data:
+            photo_map[zpid] = [
+                base_url.replace("{photoKey}", p["photoKey"])
+                for p in photo_data if p.get("photoKey")
+            ]
+
     listings = []
 
     for r in results:
@@ -195,10 +211,9 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         if not numeric_price:
             continue
 
-        # Collect all carousel photos; fall back to single imgSrc
-        carousel = r.get("carouselPhotos") or []
-        photos = [p.get("url") or p.get("src") for p in carousel if isinstance(p, dict)]
-        photos = [p for p in photos if p]  # drop None
+        # Get all photos from listResults lookup, fall back to single imgSrc
+        zpid = str(r.get("zpid", ""))
+        photos = photo_map.get(zpid) or []
         if not photos and r.get("imgSrc"):
             photos = [r["imgSrc"]]
 
