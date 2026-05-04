@@ -195,6 +195,13 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         if not numeric_price:
             continue
 
+        # Collect all carousel photos; fall back to single imgSrc
+        carousel = r.get("carouselPhotos") or []
+        photos = [p.get("url") or p.get("src") for p in carousel if isinstance(p, dict)]
+        photos = [p for p in photos if p]  # drop None
+        if not photos and r.get("imgSrc"):
+            photos = [r["imgSrc"]]
+
         listing = {
             "title":     r.get("address", ""),
             "price":     f"${numeric_price}/mo",
@@ -203,7 +210,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "beds":      r.get("minBeds", ""),
             "baths":     r.get("minBaths", ""),
             "sqft":      r.get("minArea", ""),
-            "image":     r.get("imgSrc", ""),
+            "image":     photos[0] if photos else r.get("imgSrc", ""),
+            "photos":    photos,
             "source":    "Zillow",
             "scrapedAt": datetime.now(timezone.utc).isoformat(),
         }

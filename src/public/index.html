@@ -724,23 +724,6 @@
           <!-- filled by JS -->
         </div>
       </div>
-      <div class="prow-edit" style="padding-top:4px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <div class="label">Email me new listings daily</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px;">Get new matches sent to your inbox each day</div>
-          </div>
-          <div id="email-toggle" onclick="toggleEmailPref()" style="
-            width:44px;height:26px;border-radius:13px;background:var(--border);
-            position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;
-          ">
-            <div id="email-toggle-knob" style="
-              position:absolute;top:3px;left:3px;width:20px;height:20px;
-              border-radius:50%;background:#fff;transition:transform 0.2s;
-            "></div>
-          </div>
-        </div>
-      </div>
       <div style="padding-top: 12px;">
         <button class="cta" onclick="savePrefsFromProfile()">Save criteria</button>
       </div>
@@ -892,6 +875,21 @@
 
   <!-- Agent daily picks view -->
   <div id="agent-ai-view" style="display:none;flex:1;overflow-y:auto;min-height:0;flex-direction:column;">
+    <div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="font-size:13px;font-weight:500;color:var(--text1);">Email me new listings daily</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">Get new matches sent to your inbox each day</div>
+      </div>
+      <div id="email-toggle" onclick="toggleEmailPref()" style="
+        width:44px;height:26px;border-radius:13px;background:var(--border);
+        position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;
+      ">
+        <div id="email-toggle-knob" style="
+          position:absolute;top:3px;left:3px;width:20px;height:20px;
+          border-radius:50%;background:#fff;transition:transform 0.2s;
+        "></div>
+      </div>
+    </div>
     <div class="saved-list" id="agent-daily-list"></div>
   </div>
 
@@ -1104,9 +1102,21 @@ function _syncPillUI() {
 
 let emailNotify = true;
 
-function toggleEmailPref() {
+async function toggleEmailPref() {
   emailNotify = !emailNotify;
   _syncEmailToggleUI();
+  // Auto-save to backend immediately
+  if (prefs) {
+    prefs.emailNotify = emailNotify;
+    localStorage.setItem('abode_prefs', JSON.stringify(prefs));
+    try {
+      await fetch('/api/prefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prefs),
+      });
+    } catch (_) {}
+  }
 }
 
 function _syncEmailToggleUI() {
@@ -1587,11 +1597,13 @@ function renderAgentList() {
     return;
   }
 
-  list.innerHTML = savedListings.map(l => {
+  list.innerHTML = savedListings.map((l, i) => {
     const key = listingKey(l).replace(/'/g, "\\'");
     return `
       <div class="saved-card">
-        <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
+        <div class="saved-thumb" onclick="openGalleryForSaved(${i})" style="cursor:pointer;">
+          ${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}
+        </div>
         <div class="saved-body">
           <div class="saved-price">${esc(l.price) || '—'}</div>
           <div class="saved-addr">${buildAddr(l)}</div>
@@ -1642,12 +1654,14 @@ function renderAgentDailyList() {
     return;
   }
 
-  list.innerHTML = agentDailyListings.map(l => {
+  list.innerHTML = agentDailyListings.map((l, i) => {
     const key = listingKey(l).replace(/'/g, "\\'");
     const date = l._found_at ? new Date(l._found_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     return `
       <div class="saved-card">
-        <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
+        <div class="saved-thumb" onclick="openGalleryForAgent(${i})" style="cursor:pointer;">
+          ${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}
+        </div>
         <div class="saved-body">
           <div class="saved-price">${esc(l.price) || '—'}</div>
           <div class="saved-addr">${buildAddr(l)}</div>
@@ -1756,8 +1770,8 @@ let galleryPhotos = [];
 let galleryIdx    = 0;
 let galleryStartX = 0;
 
-async function openGallery() {
-  const l = listings[currentIdx];
+async function openGallery(l) {
+  if (!l) l = listings[currentIdx];
   if (!l) return;
 
   // Open overlay immediately with spinner
@@ -1770,11 +1784,13 @@ async function openGallery() {
   document.getElementById('gallery-prev').style.display = 'none';
   document.getElementById('gallery-next').style.display = 'none';
 
-  // Fetch photos
+  // Use photos stored at scrape time, fall back to /api/photos for older listings
   galleryPhotos = [];
   galleryIdx = 0;
 
-  if (l.url && l.url.includes('zillow.com')) {
+  if (l.photos && l.photos.length > 0) {
+    galleryPhotos = l.photos;
+  } else if (l.url && l.url.includes('zillow.com')) {
     try {
       const res = await fetch('/api/photos?' + new URLSearchParams({ url: l.url }));
       if (res.ok) {
@@ -1784,7 +1800,7 @@ async function openGallery() {
     } catch (_) {}
   }
 
-  // Fall back to single image if scraping failed
+  // Fall back to single image if nothing else worked
   if (galleryPhotos.length === 0 && l.image) galleryPhotos = [l.image];
   if (galleryPhotos.length === 0) {
     document.getElementById('gallery-img-wrap').innerHTML =
@@ -1794,6 +1810,14 @@ async function openGallery() {
 
   renderGallerySlide();
   setupGallerySwipe();
+}
+
+function openGalleryForSaved(i) {
+  openGallery(savedListings[i]);
+}
+
+function openGalleryForAgent(i) {
+  openGallery(agentDailyListings[i]);
 }
 
 function renderGallerySlide() {
