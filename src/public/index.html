@@ -724,6 +724,23 @@
           <!-- filled by JS -->
         </div>
       </div>
+      <div class="prow-edit" style="padding-top:4px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="label">Email me new listings daily</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">Get new matches sent to your inbox each day</div>
+          </div>
+          <div id="email-toggle" onclick="toggleEmailPref()" style="
+            width:44px;height:26px;border-radius:13px;background:var(--border);
+            position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;
+          ">
+            <div id="email-toggle-knob" style="
+              position:absolute;top:3px;left:3px;width:20px;height:20px;
+              border-radius:50%;background:#fff;transition:transform 0.2s;
+            "></div>
+          </div>
+        </div>
+      </div>
       <div style="padding-top: 12px;">
         <button class="cta" onclick="savePrefsFromProfile()">Save criteria</button>
       </div>
@@ -753,7 +770,7 @@
   <div class="nav">
     <div class="nav-item on"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
@@ -849,47 +866,33 @@
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item on"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
 <!-- ════════════════════════════
-     SCREEN — Saved
+     SCREEN — Saved / Agent
 ════════════════════════════ -->
 <div class="screen" id="s-agent">
-  <div class="top-bar">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <button onclick="goTo('s-profile')" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px 4px 0;line-height:1;">←</button>
-      <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Saved</span></div>
-    </div>
-  </div>
-
-  <!-- List -->
-  <div style="flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;">
-    <div class="saved-list" id="agent-saved-list"></div>
-    <div style="padding: 12px 24px 0; flex-shrink: 0;" id="agent-saved-clear-wrap"></div>
-  </div>
-
-  <div class="nav">
-    <div class="nav-item on" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
-    <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
-  </div>
-</div>
-
-<!-- ════════════════════════════
-     SCREEN — Agent
-════════════════════════════ -->
-<div class="screen" id="s-agent-ai">
   <div class="top-bar">
     <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
   </div>
 
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center;">
-    <div style="font-size:48px;margin-bottom:24px;">✦</div>
-    <div style="font-size:22px;font-weight:600;color:var(--text1);margin-bottom:12px;">Agent</div>
-    <div style="font-size:15px;color:var(--text2);line-height:1.6;max-width:280px;">Your AI apartment agent is on its way. It'll search, filter, and negotiate on your behalf.</div>
-    <div style="margin-top:28px;padding:8px 20px;border-radius:20px;background:rgba(108,192,149,0.12);border:1px solid rgba(108,192,149,0.25);font-size:13px;color:var(--green);font-weight:500;">Coming soon</div>
+  <!-- Saved / Agent tabs -->
+  <div class="tab-bar">
+    <div class="tab on" id="atab-saved"  onclick="switchAgentTab('saved')">Saved</div>
+    <div class="tab"    id="atab-agent-ai" onclick="switchAgentTab('agent-ai')">Agent</div>
+  </div>
+
+  <!-- Saved view -->
+  <div id="agent-saved-view" style="flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;">
+    <div class="saved-list" id="agent-saved-list"></div>
+    <div style="padding: 12px 24px 0; flex-shrink: 0;" id="agent-saved-clear-wrap"></div>
+  </div>
+
+  <!-- Agent daily picks view -->
+  <div id="agent-ai-view" style="display:none;flex:1;overflow-y:auto;min-height:0;flex-direction:column;">
+    <div class="saved-list" id="agent-daily-list"></div>
   </div>
 
   <div class="nav">
@@ -917,7 +920,7 @@
   <div class="nav">
     <div class="nav-item on" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
@@ -949,8 +952,27 @@ function goTo(id) {
   document.getElementById(id).classList.add('active');
   if (id === 's-discover') { switchDiscoverTab('discover'); }
   if (id === 's-profile')  { renderProfile(); }
-  if (id === 's-agent')    { loadSavedForAgent(); }
+  if (id === 's-agent')    { switchAgentTab('saved'); }
   if (id === 's-passed')   { loadAndRenderPassed(); }
+}
+
+let agentTab = 'saved'; // 'saved' | 'agent-ai'
+
+function switchAgentTab(tab) {
+  agentTab = tab;
+  document.getElementById('atab-saved').classList.toggle('on', tab === 'saved');
+  document.getElementById('atab-agent-ai').classList.toggle('on', tab === 'agent-ai');
+  const savedView   = document.getElementById('agent-saved-view');
+  const agentAiView = document.getElementById('agent-ai-view');
+  if (tab === 'saved') {
+    savedView.style.display   = 'flex';
+    agentAiView.style.display = 'none';
+    loadSavedForAgent();
+  } else {
+    savedView.style.display   = 'none';
+    agentAiView.style.display = 'flex';
+    loadAgentDailyListings();
+  }
 }
 
 let discoverTab = 'discover'; // 'discover' | 'explore'
@@ -1080,6 +1102,21 @@ function _syncPillUI() {
   }
 }
 
+let emailNotify = true;
+
+function toggleEmailPref() {
+  emailNotify = !emailNotify;
+  _syncEmailToggleUI();
+}
+
+function _syncEmailToggleUI() {
+  const track = document.getElementById('email-toggle');
+  const knob  = document.getElementById('email-toggle-knob');
+  if (!track) return;
+  track.style.background = emailNotify ? 'var(--green)' : 'var(--border)';
+  knob.style.transform   = emailNotify ? 'translateX(18px)' : 'translateX(0)';
+}
+
 function savePrefs(maxRent, bedrooms, minBaths, minSqft) {
   prefs = {
     maxRent, bedrooms, minBaths,
@@ -1088,23 +1125,47 @@ function savePrefs(maxRent, bedrooms, minBaths, minSqft) {
     parking: extraFilters.parking,
     sources: ['zillow'],
     neighborhoods: [...selectedNeighborhoods],
+    emailNotify,
   };
   localStorage.setItem('abode_prefs', JSON.stringify(prefs));
 }
 
-function savePrefsFromProfile() {
+async function savePrefsFromProfile() {
   const maxRent  = parseInt(document.getElementById('prof-maxRent').value) || 0;
   const bedrooms = parseInt(document.getElementById('prof-beds').value);
   const minBaths = parseInt(document.getElementById('prof-baths').value);
   const minSqft  = parseInt(document.getElementById('prof-minSqft').value) || null;
   if (!maxRent) return;
   savePrefs(maxRent, bedrooms, minBaths, minSqft);
+  // Persist to backend so daily job can use these prefs
+  try {
+    await fetch('/api/prefs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prefs),
+    });
+  } catch (_) {}
   // Sync to discover fields too
   syncDiscoverFields();
   // Show confirmation
   const btn = document.querySelector('[onclick="savePrefsFromProfile()"]');
   btn.textContent = 'Saved ✓';
   setTimeout(() => { btn.textContent = 'Save criteria'; }, 1500);
+}
+
+async function loadPrefsFromBackend() {
+  try {
+    const res = await fetch('/api/prefs');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.prefs) {
+      prefs = data.prefs;
+      localStorage.setItem('abode_prefs', JSON.stringify(prefs));
+      if (prefs.neighborhoods) selectedNeighborhoods = new Set(prefs.neighborhoods);
+      syncProfileFields();
+      syncDiscoverFields();
+    }
+  } catch (_) {}
 }
 
 function syncDiscoverFields() {
@@ -1126,7 +1187,9 @@ function syncProfileFields() {
   document.getElementById('prof-minSqft').value = prefs.minSqft || '';
   if (prefs.laundry !== undefined) extraFilters.laundry = !!prefs.laundry;
   if (prefs.parking !== undefined) extraFilters.parking = !!prefs.parking;
+  if (prefs.emailNotify !== undefined) emailNotify = !!prefs.emailNotify;
   _syncPillUI();
+  _syncEmailToggleUI();
 }
 
 // ══════════════════════════════════════
@@ -1548,6 +1611,69 @@ function renderAgentList() {
 }
 
 // ══════════════════════════════════════
+//  Agent daily picks
+// ══════════════════════════════════════
+let agentDailyListings = [];
+
+async function loadAgentDailyListings() {
+  const list = document.getElementById('agent-daily-list');
+  if (list) list.innerHTML = `<div class="empty-state"><div style="color:var(--text3);font-size:13px;">Loading…</div></div>`;
+  try {
+    const res = await fetch('/api/agent/listings');
+    if (res.status === 401) { goTo('s-login'); return; }
+    if (res.ok) agentDailyListings = (await res.json()).listings || [];
+  } catch (_) {}
+  renderAgentDailyList();
+}
+
+function renderAgentDailyList() {
+  const list = document.getElementById('agent-daily-list');
+  if (!list) return;
+
+  if (agentDailyListings.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✦</div>
+        <div style="color:var(--text2);">No listings yet</div>
+        <div style="color:var(--text3);font-size:13px;max-width:220px;text-align:center;line-height:1.5;">
+          Save your search criteria in Profile and the daily job will find new apartments matching your preferences.
+        </div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = agentDailyListings.map(l => {
+    const key = listingKey(l).replace(/'/g, "\\'");
+    const date = l._found_at ? new Date(l._found_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    return `
+      <div class="saved-card">
+        <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
+        <div class="saved-body">
+          <div class="saved-price">${esc(l.price) || '—'}</div>
+          <div class="saved-addr">${buildAddr(l)}</div>
+          <div class="saved-tags">
+            ${l.beds      ? `<div class="saved-tag">${l.beds}bd</div>`        : ''}
+            ${l.baths     ? `<div class="saved-tag">${l.baths}ba</div>`       : ''}
+            ${l.sqft      ? `<div class="saved-tag">${l.sqft}sqft</div>`      : ''}
+            ${l._category ? `<div class="saved-tag">${esc(l._category)}</div>` : ''}
+            ${date        ? `<div class="saved-tag" style="color:var(--text3);">${date}</div>` : ''}
+          </div>
+        </div>
+        <div class="saved-actions">
+          ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
+          <button class="saved-btn" style="color:var(--green);border-color:rgba(108,192,149,0.3);" onclick="saveFromAgent('${key}')">Save</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function saveFromAgent(key) {
+  const listing = agentDailyListings.find(l => listingKey(l).replace(/'/g, "\\'") === key || listingKey(l) === key);
+  if (!listing) return;
+  await saveListing(listing);
+}
+
+// ══════════════════════════════════════
 //  Passed screen
 // ══════════════════════════════════════
 async function loadAndRenderPassed() {
@@ -1810,6 +1936,8 @@ function esc(str) {
         if (sk.ok) (await sk.json()).keys.forEach(k => seenKeys.add(k));
         localStorage.setItem('abode_seen', JSON.stringify([...seenKeys]));
       } catch (_) {}
+      // Load prefs from backend (overrides localStorage with server truth)
+      await loadPrefsFromBackend();
       goTo('s-profile');
     } else {
       goTo('s-login');

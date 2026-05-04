@@ -71,6 +71,24 @@ def init_db():
                     cached_at   TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_prefs (
+                    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    prefs       JSONB NOT NULL,
+                    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS agent_listings (
+                    id          SERIAL PRIMARY KEY,
+                    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    key         TEXT NOT NULL,
+                    data        JSONB NOT NULL,
+                    category    TEXT NOT NULL DEFAULT '',
+                    found_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    UNIQUE (user_id, key)
+                )
+            """)
         conn.commit()
 
 
@@ -229,6 +247,80 @@ def cache_clear() -> None:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM search_cache")
         conn.commit()
+
+
+# ── User prefs helpers ────────────────────────────────────────────────────────
+
+def load_prefs(user_id: int) -> dict | None:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT prefs FROM user_prefs WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+    return dict(row["prefs"]) if row else None
+
+
+def save_prefs(user_id: int, prefs: dict) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO user_prefs (user_id, prefs, updated_at)
+                VALUES (%s, %s, now())
+                ON CONFLICT (user_id) DO UPDATE
+                    SET prefs      = EXCLUDED.prefs,
+                        updated_at = EXCLUDED.updated_at
+            """, (user_id, json.dumps(prefs)))
+        conn.commit()
+
+
+def load_all_user_prefs() -> list[dict]:
+    """Return all users' prefs — used by the daily job."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT user_id, prefs FROM user_prefs")
+            return [{"user_id": row["user_id"], "prefs": dict(row["prefs"])} for row in cur.fetchall()]
+
+
+# ── Agent listings helpers ────────────────────────────────────────────────────
+
+def save_agent_listings(user_id: int, listings: list[dict], category: str) -> None:
+    """Upsert listings found by the daily job for a specific user."""
+    if not DATABASE_URL or not listings:
+        return
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            for listing in listings:
+                key = listing_key(listing)
+                if not key:
+                    continue
+                cur.execute("""
+                    INSERT INTO agent_listings (user_id, key, data, category, found_at)
+                    VALUES (%s, %s, %s, %s, now())
+                    ON CONFLICT (user_id, key) DO UPDATE
+                        SET data     = EXCLUDED.data,
+                            category = EXCLUDED.category,
+                            found_at = EXCLUDED.found_at
+                """, (user_id, key, json.dumps(listing), category))
+        conn.commit()
+
+
+def load_agent_listings(user_id: int) -> list[dict]:
+    """Return agent listings for a user, newest first."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT data, category, found_at
+                FROM agent_listings
+                WHERE user_id = %s
+                ORDER BY found_at DESC
+            """, (user_id,))
+            rows = cur.fetchall()
+    result = []
+    for row in rows:
+        listing = dict(row["data"])
+        listing["_category"] = row["category"]
+        listing["_found_at"] = row["found_at"].isoformat()
+        result.append(listing)
+    return result
 
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
@@ -444,6 +536,36 @@ def get_passed():
         return err
     keys = load_passed_keys(uid)
     return jsonify({"keys": keys})
+
+
+@app.route("/api/prefs", methods=["GET"])
+def get_prefs():
+    uid, err = require_auth()
+    if err:
+        return err
+    prefs = load_prefs(uid)
+    return jsonify({"prefs": prefs})
+
+
+@app.route("/api/prefs", methods=["POST"])
+def post_prefs():
+    uid, err = require_auth()
+    if err:
+        return err
+    prefs = request.get_json(force=True)
+    if not prefs or not isinstance(prefs, dict):
+        return jsonify({"error": "Invalid prefs"}), 400
+    save_prefs(uid, prefs)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/agent/listings", methods=["GET"])
+def get_agent_listings():
+    uid, err = require_auth()
+    if err:
+        return err
+    listings = load_agent_listings(uid)
+    return jsonify({"listings": listings})
 
 
 @app.route("/api/neighborhoods", methods=["GET"])
