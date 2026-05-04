@@ -732,8 +732,20 @@
     <div class="pcard">
       <div class="pchead">Activity</div>
       <div class="prow"><span class="pkey">Listings viewed</span><span class="pval" id="prof-viewed">0</span></div>
-      <div class="prow"><span class="pkey">Saved</span><span class="pval" id="prof-saved-count">0</span></div>
-      <div class="prow"><span class="pkey">Passed</span><span class="pval" id="prof-passed">0</span></div>
+      <div class="prow" style="cursor:pointer;" onclick="goTo('s-agent')">
+        <span class="pkey">Saved</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span class="pval" id="prof-saved-count">0</span>
+          <span style="color:var(--text3);font-size:13px;">→</span>
+        </span>
+      </div>
+      <div class="prow" style="cursor:pointer;" onclick="goTo('s-passed')">
+        <span class="pkey">Passed</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span class="pval" id="prof-passed">0</span>
+          <span style="color:var(--text3);font-size:13px;">→</span>
+        </span>
+      </div>
     </div>
 
     <button class="cta-ghost" style="border-color:rgba(201,68,68,0.3);color:var(--red);" onclick="doLogout()">Sign out</button>
@@ -741,7 +753,7 @@
   <div class="nav">
     <div class="nav-item on"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
@@ -837,22 +849,19 @@
   <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item on"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item" onclick="goTo('s-agent')"><div class="nav-icon">✦</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
 <!-- ════════════════════════════
-     SCREEN — Saved / Passed
+     SCREEN — Saved
 ════════════════════════════ -->
 <div class="screen" id="s-agent">
   <div class="top-bar">
-    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
-  </div>
-
-  <!-- Saved / Passed tabs -->
-  <div class="tab-bar">
-    <div class="tab on" id="atab-saved"  onclick="switchAgentTab('saved')">Saved</div>
-    <div class="tab"    id="atab-passed" onclick="switchAgentTab('passed')">Passed</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button onclick="goTo('s-profile')" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px 4px 0;line-height:1;">←</button>
+      <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Saved</span></div>
+    </div>
   </div>
 
   <!-- List -->
@@ -862,9 +871,53 @@
   </div>
 
   <div class="nav">
+    <div class="nav-item on" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+    <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     SCREEN — Agent
+════════════════════════════ -->
+<div class="screen" id="s-agent-ai">
+  <div class="top-bar">
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:24px;">✦</div>
+    <div style="font-size:22px;font-weight:600;color:var(--text1);margin-bottom:12px;">Agent</div>
+    <div style="font-size:15px;color:var(--text2);line-height:1.6;max-width:280px;">Your AI apartment agent is on its way. It'll search, filter, and negotiate on your behalf.</div>
+    <div style="margin-top:28px;padding:8px 20px;border-radius:20px;background:rgba(108,192,149,0.12);border:1px solid rgba(108,192,149,0.25);font-size:13px;color:var(--green);font-weight:500;">Coming soon</div>
+  </div>
+
+  <div class="nav">
     <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
     <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
-    <div class="nav-item on"><div class="nav-icon">✦</div><div class="nav-lbl">Saved</div></div>
+    <div class="nav-item on"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     SCREEN — Passed listings
+════════════════════════════ -->
+<div class="screen" id="s-passed">
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button onclick="goTo('s-profile')" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px 4px 0;line-height:1;">←</button>
+      <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Passed</span></div>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;">
+    <div class="saved-list" id="passed-list"></div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-item on" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+    <div class="nav-item" onclick="goTo('s-discover')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+    <div class="nav-item" onclick="goTo('s-agent-ai')"><div class="nav-icon">✦</div><div class="nav-lbl">Agent</div></div>
   </div>
 </div>
 
@@ -897,6 +950,7 @@ function goTo(id) {
   if (id === 's-discover') { switchDiscoverTab('discover'); }
   if (id === 's-profile')  { renderProfile(); }
   if (id === 's-agent')    { loadSavedForAgent(); }
+  if (id === 's-passed')   { loadAndRenderPassed(); }
 }
 
 let discoverTab = 'discover'; // 'discover' | 'explore'
@@ -920,15 +974,6 @@ function switchDiscoverTab(tab) {
   }
 }
 
-let agentTab = 'saved'; // 'saved' | 'passed'
-
-function switchAgentTab(tab) {
-  agentTab = tab;
-  ['saved','passed'].forEach(t => {
-    document.getElementById('atab-' + t).classList.toggle('on', t === tab);
-  });
-  renderAgentList();
-}
 
 // ══════════════════════════════════════
 //  Auth
@@ -1450,86 +1495,96 @@ async function unsaveListing(key) {
 
 async function loadSavedForAgent() {
   try {
-    const [sr, pr] = await Promise.all([fetch('/api/saved'), fetch('/api/passed')]);
+    const sr = await fetch('/api/saved');
     if (sr.status === 401) { goTo('s-login'); return; }
     if (sr.ok) savedListings = (await sr.json()).listings || [];
-    if (pr.ok) passedKeys    = (await pr.json()).keys || [];
   } catch (_) {}
   renderAgentList();
 }
 
 // ══════════════════════════════════════
-//  Agent screen (Saved / Passed)
+//  Agent screen (Saved)
 // ══════════════════════════════════════
 function renderAgentList() {
   const list      = document.getElementById('agent-saved-list');
   const clearWrap = document.getElementById('agent-saved-clear-wrap');
   if (!list) return;
 
-  if (agentTab === 'saved') {
-    const count = savedListings.length;
-    clearWrap.innerHTML = count > 0
-      ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>` : '';
+  const count = savedListings.length;
+  clearWrap.innerHTML = count > 0
+    ? `<button class="cta-ghost" style="margin-bottom:4px;" onclick="clearAllSaved()">Clear all saved</button>` : '';
 
-    if (count === 0) {
-      list.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">♡</div>
-          <div style="color:var(--text2);">No saved apartments yet</div>
-          <div style="color:var(--text3);font-size:13px;">Tap ♡ while swiping to save listings you like</div>
-        </div>`;
-      return;
-    }
+  if (count === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">♡</div>
+        <div style="color:var(--text2);">No saved apartments yet</div>
+        <div style="color:var(--text3);font-size:13px;">Tap ♡ while swiping to save listings you like</div>
+      </div>`;
+    return;
+  }
 
-    list.innerHTML = savedListings.map(l => {
-      const key = listingKey(l).replace(/'/g, "\\'");
-      return `
-        <div class="saved-card">
-          <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
-          <div class="saved-body">
-            <div class="saved-price">${esc(l.price) || '—'}</div>
-            <div class="saved-addr">${buildAddr(l)}</div>
-            <div class="saved-tags">
-              ${l.beds   ? `<div class="saved-tag">${l.beds}bd</div>`      : ''}
-              ${l.baths  ? `<div class="saved-tag">${l.baths}ba</div>`     : ''}
-              ${l.sqft   ? `<div class="saved-tag">${l.sqft}sqft</div>`    : ''}
-              ${l.source ? `<div class="saved-tag">${esc(l.source)}</div>` : ''}
-            </div>
-          </div>
-          <div class="saved-actions">
-            ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
-            <button class="saved-btn remove" onclick="unsaveListing('${key}')">Remove</button>
-          </div>
-        </div>`;
-    }).join('');
-
-  } else {
-    // Passed tab — we only have keys, not full listing data
-    const count = passedKeys.length;
-    clearWrap.innerHTML = '';
-
-    if (count === 0) {
-      list.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">✕</div>
-          <div style="color:var(--text2);">No passed apartments yet</div>
-          <div style="color:var(--text3);font-size:13px;">Listings you pass on will appear here</div>
-        </div>`;
-      return;
-    }
-
-    list.innerHTML = passedKeys.map(key => `
-      <div class="saved-card" style="opacity:0.6;">
-        <div class="saved-thumb" style="font-size:20px;color:var(--red);">✕</div>
+  list.innerHTML = savedListings.map(l => {
+    const key = listingKey(l).replace(/'/g, "\\'");
+    return `
+      <div class="saved-card">
+        <div class="saved-thumb">${l.image ? `<img src="${esc(l.image)}" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🏢'">` : '🏢'}</div>
         <div class="saved-body">
-          <div class="saved-price" style="font-size:13px;color:var(--text2);">Passed listing</div>
-          <div class="saved-addr" style="font-size:11px;">${esc(key.length > 60 ? key.slice(0,60)+'…' : key)}</div>
+          <div class="saved-price">${esc(l.price) || '—'}</div>
+          <div class="saved-addr">${buildAddr(l)}</div>
+          <div class="saved-tags">
+            ${l.beds   ? `<div class="saved-tag">${l.beds}bd</div>`      : ''}
+            ${l.baths  ? `<div class="saved-tag">${l.baths}ba</div>`     : ''}
+            ${l.sqft   ? `<div class="saved-tag">${l.sqft}sqft</div>`    : ''}
+            ${l.source ? `<div class="saved-tag">${esc(l.source)}</div>` : ''}
+          </div>
         </div>
         <div class="saved-actions">
-          <button class="saved-btn view" onclick="reconsiderListing('${key.replace(/'/g,"\\'")}')">Reconsider</button>
+          ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
+          <button class="saved-btn remove" onclick="unsaveListing('${key}')">Remove</button>
         </div>
-      </div>`).join('');
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  Passed screen
+// ══════════════════════════════════════
+async function loadAndRenderPassed() {
+  try {
+    const pr = await fetch('/api/passed');
+    if (pr.ok) passedKeys = (await pr.json()).keys || [];
+  } catch (_) {}
+  renderPassedList();
+}
+
+function renderPassedList() {
+  const list = document.getElementById('passed-list');
+  if (!list) return;
+
+  const count = passedKeys.length;
+
+  if (count === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✕</div>
+        <div style="color:var(--text2);">No passed apartments yet</div>
+        <div style="color:var(--text3);font-size:13px;">Listings you pass on will appear here</div>
+      </div>`;
+    return;
   }
+
+  list.innerHTML = passedKeys.map(key => `
+    <div class="saved-card" style="opacity:0.6;">
+      <div class="saved-thumb" style="font-size:20px;color:var(--red);">✕</div>
+      <div class="saved-body">
+        <div class="saved-price" style="font-size:13px;color:var(--text2);">Passed listing</div>
+        <div class="saved-addr" style="font-size:11px;">${esc(key.length > 60 ? key.slice(0,60)+'…' : key)}</div>
+      </div>
+      <div class="saved-actions">
+        <button class="saved-btn view" onclick="reconsiderListing('${key.replace(/'/g,"\\'")}')">Reconsider</button>
+      </div>
+    </div>`).join('');
 }
 
 async function reconsiderListing(key) {
@@ -1543,7 +1598,7 @@ async function reconsiderListing(key) {
       body: JSON.stringify({ key }),
     });
   } catch (_) {}
-  renderAgentList();
+  renderPassedList();
 }
 
 async function clearAllSaved() {
