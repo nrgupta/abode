@@ -86,9 +86,9 @@ def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=
         "isComingSoon":         {"value": False},
         "isAuction":            {"value": False},
         "isForSaleForeclosure": {"value": False},
-        "monthlyPayment":       {"min": min_rent, "max": max_rent},
-        "beds":                 {"min": min_beds, "max": max_beds},
-        "baths":                {"min": min_baths, "max": max_baths},
+        "monthlyPayment": {k: v for k, v in {"min": min_rent, "max": max_rent}.items() if v is not None},
+        "beds":           {k: v for k, v in {"min": min_beds,  "max": max_beds}.items()  if v is not None},
+        "baths":          {k: v for k, v in {"min": min_baths, "max": max_baths}.items() if v is not None},
     }
 
     # Only add these filters when the user has explicitly requested them
@@ -168,9 +168,6 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "accept-language": "en-US,en;q=0.9",
             "content-type":    "application/json",
             "content-length":  str(len(body)),
-            "sec-fetch-dest":  "empty",
-            "sec-fetch-mode":  "cors",
-            "sec-fetch-site":  "same-origin",
             "user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
         },
     )
@@ -186,11 +183,10 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         print(f"Zillow request error: {e}")
         return []
 
-    cat1          = data.get("cat1") or {}
-    search_results = cat1.get("searchResults", {})
+    search_results = (data.get("cat1") or {}).get("searchResults", {})
     results = search_results.get("mapResults", [])
 
-    # Build zpid → photos map from listResults (which has carouselPhotosComposable)
+    # Build zpid → carousel photos map from listResults
     photo_map: dict[str, list[str]] = {}
     for lr in search_results.get("listResults", []):
         zpid = str(lr.get("zpid", ""))
@@ -211,7 +207,6 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         if not numeric_price:
             continue
 
-        # Get all photos from listResults lookup, fall back to single imgSrc
         zpid = str(r.get("zpid", ""))
         photos = photo_map.get(zpid) or []
         if not photos and r.get("imgSrc"):
@@ -225,7 +220,7 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "beds":      r.get("minBeds", ""),
             "baths":     r.get("minBaths", ""),
             "sqft":      r.get("minArea", ""),
-            "image":     photos[0] if photos else r.get("imgSrc", ""),
+            "image":     photos[0] if photos else "",
             "photos":    photos,
             "source":    "Zillow",
             "scrapedAt": datetime.now(timezone.utc).isoformat(),
