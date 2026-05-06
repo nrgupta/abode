@@ -104,7 +104,7 @@ async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     beds = filters["bedrooms"]
     category = f"{beds}bd/{filters['minBaths']}ba"
     print(f"  User {user_id}: scraping {category}, maxRent=${filters['maxRent']}")
-    listings = await run_agent(filters, sources=["zillow"])
+    listings, _ = await run_agent(filters, sources=["zillow"])
     new_listings = await sync_to_sheets(listings, sheet_key=f"user_{user_id}")
     save_agent_listings(user_id, new_listings, category)
     print(f"  User {user_id}: {len(new_listings)} new listings saved")

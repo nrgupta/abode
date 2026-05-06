@@ -433,18 +433,22 @@ def search():
         return jsonify({"results": grouped, "total": len(cached), "cached": True})
 
     try:
-        listings = asyncio.run(run_agent(filters, sources))
+        listings, scraper_errors = asyncio.run(run_agent(filters, sources))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    cache_set(filters, listings)
+    if listings:
+        cache_set(filters, listings)
 
     grouped: dict[str, list] = {}
     for listing in listings:
         source = listing.get("source", "Other")
         grouped.setdefault(source, []).append(listing)
 
-    return jsonify({"results": grouped, "total": len(listings), "cached": False})
+    resp: dict = {"results": grouped, "total": len(listings), "cached": False}
+    if scraper_errors:
+        resp["errors"] = scraper_errors
+    return jsonify(resp)
 
 
 @app.route("/api/saved", methods=["GET"])

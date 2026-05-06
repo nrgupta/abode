@@ -26,7 +26,7 @@ def deduplicate_listings(listings: list[dict]) -> list[dict]:
     return unique
 
 
-async def run_agent(filters: dict, sources: list[str] | None = None) -> list[dict]:
+async def run_agent(filters: dict, sources: list[str] | None = None) -> tuple[list[dict], dict[str, str]]:
     if sources is None:
         sources = ["craigslist", "redfin", "zillow"]
 
@@ -42,24 +42,27 @@ async def run_agent(filters: dict, sources: list[str] | None = None) -> list[dic
     results = await asyncio.gather(*[fn(filters) for _, fn in selected_scrapers], return_exceptions=True)
 
     all_listings = []
+    errors: dict[str, str] = {}
     for (key, _), result in zip(selected_scrapers, results):
         if isinstance(result, Exception):
-            print(f"{key} scraper error: {result}")
+            msg = str(result)
+            print(f"{key} scraper error: {msg}")
+            errors[key] = msg
         else:
             all_listings.extend(result)
 
     unique = deduplicate_listings(all_listings)
     print(f"Found {len(unique)} unique listings ({len(all_listings)} total before dedup)")
-    return unique
+    return unique, errors
 
 
 async def run_daily_agent() -> tuple[list[dict], list[dict]]:
     # Scrape 2by2 apartments
-    listings_2by2 = await run_agent(search2by2, sources=["zillow"])
+    listings_2by2, _ = await run_agent(search2by2, sources=["zillow"])
     new_2by2 = await sync_to_sheets(listings_2by2, sheet_key="2by2")
 
     # Scrape 1by1 apartments
-    listings_1by1 = await run_agent(search1by1, sources=["zillow"])
+    listings_1by1, _ = await run_agent(search1by1, sources=["zillow"])
     new_1by1 = await sync_to_sheets(listings_1by1, sheet_key="1by1")
 
     return new_2by2, new_1by1
