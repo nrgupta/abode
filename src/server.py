@@ -303,6 +303,26 @@ def save_agent_listings(user_id: int, listings: list[dict], category: str) -> No
         conn.commit()
 
 
+def purge_expired_agent_listings(user_id: int, active_keys: set) -> int:
+    """Delete agent listings no longer present in the latest scrape results."""
+    if not DATABASE_URL or not active_keys:
+        return 0
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key FROM agent_listings WHERE user_id = %s", (user_id,))
+            stored_keys = {row[0] for row in cur.fetchall()}
+        expired_keys = list(stored_keys - active_keys)
+        if not expired_keys:
+            return 0
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM agent_listings WHERE user_id = %s AND key = ANY(%s)",
+                (user_id, expired_keys),
+            )
+        conn.commit()
+    return len(expired_keys)
+
+
 def load_agent_listings(user_id: int) -> list[dict]:
     """Return agent listings for a user, newest first."""
     with get_conn() as conn:

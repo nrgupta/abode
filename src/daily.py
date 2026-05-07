@@ -11,9 +11,8 @@ load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.listingsTool import run_agent
-from server import load_all_user_prefs, save_agent_listings
+from server import load_all_user_prefs, save_agent_listings, purge_expired_agent_listings
 from sheets.google_sheets import sync_to_sheets
-from server import save_agent_listings
 
 
 def format_section(title: str, listings: list) -> str:
@@ -105,6 +104,13 @@ async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     category = f"{beds}bd/{filters['minBaths']}ba"
     print(f"  User {user_id}: scraping {category}, maxRent=${filters['maxRent']}")
     listings, _ = await run_agent(filters, sources=["zillow"])
+
+    # Remove agent listings no longer in the current scrape (rented/expired)
+    active_keys = {(l.get("url") or l.get("title") or "").lower().strip() for l in listings}
+    expired = purge_expired_agent_listings(user_id, active_keys)
+    if expired:
+        print(f"  User {user_id}: removed {expired} expired listing(s)")
+
     new_listings = await sync_to_sheets(listings, sheet_key=f"user_{user_id}")
     save_agent_listings(user_id, new_listings, category)
     print(f"  User {user_id}: {len(new_listings)} new listings saved")
