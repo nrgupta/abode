@@ -2,13 +2,10 @@ import json
 import os
 import re
 import ssl
-import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
 ZILLOW_API_URL  = "https://www.zillow.com/async-create-search-page-state"
-SCRAPERAPI_KEY  = os.environ.get("SCRAPERAPI_KEY", "")
-SCRAPERAPI_URL  = "https://api.scraperapi.com/"
 
 MAP_ZOOM = 13
 
@@ -183,27 +180,12 @@ async def scrape_zillow(filters: dict) -> list[dict]:
     ssl_ctx.verify_mode = ssl.CERT_NONE
 
     try:
-        if SCRAPERAPI_KEY:
-            # Route through ScraperAPI to avoid IP blocks
-            # Pass api_key + target url as query params, send body as PUT directly
-            proxy_url = (
-                "https://api.scraperapi.com/?"
-                + urllib.parse.urlencode({"api_key": SCRAPERAPI_KEY, "url": ZILLOW_API_URL})
-            )
-            req = urllib.request.Request(
-                proxy_url,
-                data=zillow_body,
-                method="PUT",
-                headers=zillow_headers,
-            )
-            print("  Scraping via ScraperAPI...")
-        else:
-            req = urllib.request.Request(
-                ZILLOW_API_URL,
-                data=zillow_body,
-                method="PUT",
-                headers={**zillow_headers, "content-length": str(len(zillow_body))},
-            )
+        req = urllib.request.Request(
+            ZILLOW_API_URL,
+            data=zillow_body,
+            method="PUT",
+            headers={**zillow_headers, "content-length": str(len(zillow_body))},
+        )
 
         with urllib.request.urlopen(req, context=ssl_ctx, timeout=90) as resp:
             raw = resp.read().decode("utf-8")
