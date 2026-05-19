@@ -168,8 +168,6 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "accept-language": "en-US,en;q=0.9",
             "content-type":    "application/json",
             "content-length":  str(len(body)),
-            "origin":          "https://www.zillow.com",
-            "referer":         "https://www.zillow.com/chicago-il/rentals/",
             "user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
         },
     )
