@@ -745,7 +745,7 @@ def lookup_address():
         "title":     best.get("address", address),
         "price":     f"${numeric_price}/mo" if numeric_price else "—",
         "location":  best.get("address", address),
-        "url":       f"https://www.zillow.com{best.get('detailUrl', '')}",
+        "url":       best.get('detailUrl', '') if best.get('detailUrl', '').startswith('http') else f"https://www.zillow.com{best.get('detailUrl', '')}",
         "beds":      best.get("minBeds", ""),
         "baths":     best.get("minBaths", ""),
         "sqft":      best.get("minArea", ""),

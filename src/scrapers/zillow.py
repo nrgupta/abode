@@ -225,7 +225,7 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "title":     r.get("address", ""),
             "price":     f"${numeric_price}/mo",
             "location":  r.get("address", ""),
-            "url":       f"https://www.zillow.com{r.get('detailUrl', '')}",
+            "url":       r.get('detailUrl', '') if r.get('detailUrl', '').startswith('http') else f"https://www.zillow.com{r.get('detailUrl', '')}",
             "beds":      r.get("minBeds", ""),
             "baths":     r.get("minBaths", ""),
             "sqft":      r.get("minArea", ""),
