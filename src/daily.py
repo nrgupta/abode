@@ -44,13 +44,14 @@ def get_user_email(user_id: int) -> str | None:
         return None
 
 
-def send_email(new_listings: list, _unused: list, user_id: int | None = None):
+def send_email(new_listings: list, _unused: list, user_id: int | None = None, gmail_address: str | None = None, gmail_app_password: str | None = None):
     """Send email digest of new listings to the user."""
-    sender_email    = os.getenv("GMAIL_ADDRESS")
-    sender_password = os.getenv("GMAIL_APP_PASSWORD")
+    # Prefer per-user credentials from prefs; fall back to env vars
+    sender_email    = gmail_address    or os.getenv("GMAIL_ADDRESS")
+    sender_password = gmail_app_password or os.getenv("GMAIL_APP_PASSWORD")
 
     if not sender_email or not sender_password:
-        print("Warning: Email credentials not configured (GMAIL_ADDRESS, GMAIL_APP_PASSWORD)")
+        print("Warning: Email credentials not configured (set Gmail address/app password in Profile)")
         return
 
     recipient_email = get_user_email(user_id) if user_id else "neilg2001@gmail.com"
@@ -142,7 +143,11 @@ async def main():
         try:
             new_listings = await run_for_user(user_id, prefs)
             if prefs.get("emailNotify"):
-                send_email(new_listings, [], user_id)
+                send_email(
+                    new_listings, [], user_id,
+                    gmail_address=prefs.get("gmailAddress"),
+                    gmail_app_password=prefs.get("gmailAppPassword"),
+                )
             else:
                 print(f"  User {user_id}: email notifications off, skipping email")
         except Exception as e:

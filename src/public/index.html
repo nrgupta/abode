@@ -748,6 +748,41 @@
       </div>
     </div>
 
+    <div class="pcard">
+      <div class="pchead">Email notifications</div>
+      <div class="prow-edit" style="flex-direction:row;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="label">Email me new listings daily</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">Get new matches sent to your inbox each day</div>
+        </div>
+        <div id="prof-email-toggle" onclick="toggleEmailPref()" style="
+          width:44px;height:26px;border-radius:13px;background:var(--border);
+          position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;
+        ">
+          <div id="prof-email-toggle-knob" style="
+            position:absolute;top:3px;left:3px;width:20px;height:20px;
+            border-radius:50%;background:#fff;transition:transform 0.2s;
+          "></div>
+        </div>
+      </div>
+      <div id="email-creds-section" style="display:none;flex-direction:column;gap:8px;margin-top:8px;">
+        <div>
+          <div class="label" style="margin-bottom:4px;">Gmail address</div>
+          <input class="inp" id="gmail-address" type="email" placeholder="you@gmail.com"
+            autocomplete="email" style="font-size:13px;padding:8px 10px;" />
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:4px;">Gmail app password</div>
+          <input class="inp" id="gmail-app-password" type="password" placeholder="xxxx xxxx xxxx xxxx"
+            autocomplete="off" style="font-size:13px;padding:8px 10px;" />
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">
+            Generate one at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--green);">myaccount.google.com/apppasswords</a>
+          </div>
+        </div>
+        <button class="cta" onclick="saveEmailCreds()" style="margin-top:4px;">Save email settings</button>
+      </div>
+    </div>
+
     <button class="cta-ghost" style="border-color:rgba(201,68,68,0.3);color:var(--red);" onclick="doLogout()">Sign out</button>
   </div>
   <div class="nav">
@@ -890,6 +925,7 @@
         "></div>
       </div>
     </div>
+
     <div class="saved-list" id="agent-daily-list"></div>
   </div>
 
@@ -1120,11 +1156,41 @@ async function toggleEmailPref() {
 }
 
 function _syncEmailToggleUI() {
+  // Agent tab toggle
   const track = document.getElementById('email-toggle');
   const knob  = document.getElementById('email-toggle-knob');
-  if (!track) return;
-  track.style.background = emailNotify ? 'var(--green)' : 'var(--border)';
-  knob.style.transform   = emailNotify ? 'translateX(18px)' : 'translateX(0)';
+  if (track) {
+    track.style.background = emailNotify ? 'var(--green)' : 'var(--border)';
+    knob.style.transform   = emailNotify ? 'translateX(18px)' : 'translateX(0)';
+  }
+  // Profile tab toggle
+  const ptrack = document.getElementById('prof-email-toggle');
+  const pknob  = document.getElementById('prof-email-toggle-knob');
+  if (ptrack) {
+    ptrack.style.background = emailNotify ? 'var(--green)' : 'var(--border)';
+    pknob.style.transform   = emailNotify ? 'translateX(18px)' : 'translateX(0)';
+  }
+  // Show/hide credentials section
+  const credsSection = document.getElementById('email-creds-section');
+  if (credsSection) credsSection.style.display = emailNotify ? 'flex' : 'none';
+}
+
+async function saveEmailCreds() {
+  if (!prefs) return;
+  const gmailAddress     = (document.getElementById('gmail-address').value || '').trim();
+  const gmailAppPassword = (document.getElementById('gmail-app-password').value || '').trim();
+  prefs.gmailAddress     = gmailAddress;
+  prefs.gmailAppPassword = gmailAppPassword;
+  localStorage.setItem('abode_prefs', JSON.stringify(prefs));
+  try {
+    await fetch('/api/prefs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prefs),
+    });
+  } catch (_) {}
+  const btn = document.querySelector('[onclick="saveEmailCreds()"]');
+  if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => { btn.textContent = 'Save email settings'; }, 1500); }
 }
 
 function savePrefs(maxRent, bedrooms, minBaths, minSqft) {
@@ -1198,6 +1264,10 @@ function syncProfileFields() {
   if (prefs.laundry !== undefined) extraFilters.laundry = !!prefs.laundry;
   if (prefs.parking !== undefined) extraFilters.parking = !!prefs.parking;
   if (prefs.emailNotify !== undefined) emailNotify = !!prefs.emailNotify;
+  const ga = document.getElementById('gmail-address');
+  const gp = document.getElementById('gmail-app-password');
+  if (ga && prefs.gmailAddress)     ga.value = prefs.gmailAddress;
+  if (gp && prefs.gmailAppPassword) gp.value = prefs.gmailAppPassword;
   _syncPillUI();
   _syncEmailToggleUI();
 }
