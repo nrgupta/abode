@@ -1,0 +1,25 @@
+[
+  {
+    "baths": "",
+    "beds": "",
+    "location": "420 W Belmont Ave #27E-R, Chicago, IL 60657",
+    "price": "$3891/mo",
+    "scrapedAt": "2026-04-20T03:27:03.876548+00:00",
+    "source": "Zillow",
+    "sqft": "",
+    "title": "420 W Belmont Ave #27E-R, Chicago, IL 60657",
+    "url": "https://www.zillow.com/apartments/chicago-il/wave-lakeview/CpQcNw/"
+  },
+  {
+    "baths": "",
+    "beds": "",
+    "image": "https://photos.zillowstatic.com/fp/9d4452098d3b54637ab4bef1c9631ec8-p_e.jpg",
+    "location": "1435 N Wells St #402, Chicago, IL 60610",
+    "price": "$3825/mo",
+    "scrapedAt": "2026-04-20T03:33:49.688223+00:00",
+    "source": "Zillow",
+    "sqft": "",
+    "title": "1435 N Wells St #402, Chicago, IL 60610",
+    "url": "https://www.zillow.com/apartments/chicago-il/1435-wells/CkDxGX/"
+  }
+]

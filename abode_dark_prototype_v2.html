@@ -1,0 +1,380 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f0f12;
+  --bg2: #18181f;
+  --bg3: #22222c;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0eefc;
+  --text2: #9e9db5;
+  --text3: #5f5e72;
+  --green: #1D9E75;
+  --green-light: #5DCAA5;
+  --green-dim: #0a2e22;
+  --red: #c94444;
+}
+.phone {
+  width: 375px; min-height: 800px; margin: 1.5rem auto;
+  background: var(--bg); border-radius: 40px;
+  border: 1px solid var(--border2); overflow: hidden;
+}
+.screen { display: none; flex-direction: column; min-height: 800px; }
+.screen.active { display: flex; }
+.status { padding: 14px 24px 4px; display: flex; justify-content: space-between; font-size: 12px; color: var(--text3); font-family: var(--font-sans); }
+.logo-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 0 6px; }
+.logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+.logo-text { font-size: 22px; font-weight: 500; color: var(--text); font-family: var(--font-sans); letter-spacing: -0.5px; }
+.content { flex: 1; padding: 0 22px 24px; display: flex; flex-direction: column; gap: 13px; overflow-y: auto; font-family: var(--font-sans); }
+.label { font-size: 11px; color: var(--text3); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; }
+.inp {
+  background: var(--bg2); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 11px 14px; font-size: 15px;
+  color: var(--text); width: 100%; font-family: var(--font-sans);
+}
+.inp::placeholder { color: var(--text3); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  padding: 7px 14px; border-radius: 20px; font-size: 13px;
+  border: 0.5px solid var(--border2); background: var(--bg2);
+  color: var(--text2); cursor: pointer; font-family: var(--font-sans);
+}
+.pill.on { background: var(--green-dim); border-color: var(--green); color: var(--green-light); font-weight: 500; }
+.cta { background: var(--green); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 500; cursor: pointer; width: 100%; font-family: var(--font-sans); }
+.cta:hover { background: #0F6E56; }
+.cta-ghost { background: transparent; border: 0.5px solid var(--border2); color: var(--text2); border-radius: 12px; padding: 14px; font-size: 16px; cursor: pointer; width: 100%; font-family: var(--font-sans); }
+.sec-title { font-size: 17px; font-weight: 500; color: var(--text); font-family: var(--font-sans); }
+.sec-sub { font-size: 13px; color: var(--text2); margin-top: 2px; font-family: var(--font-sans); }
+.steps { display: flex; gap: 6px; justify-content: center; padding: 4px 0; }
+.step { width: 6px; height: 6px; border-radius: 50%; background: var(--bg3); }
+.step.done { background: var(--green); }
+.step.cur { background: var(--green); width: 18px; }
+.small-link { text-align: center; font-size: 13px; color: var(--text3); cursor: pointer; padding: 4px; font-family: var(--font-sans); }
+.small-link span { color: var(--green); }
+.nav { display: flex; justify-content: space-around; align-items: center; padding: 12px 0 22px; border-top: 0.5px solid var(--border); background: var(--bg); }
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+.nav-icon { font-size: 18px; color: var(--text3); font-family: var(--font-sans); }
+.nav-lbl { font-size: 10px; color: var(--text3); font-family: var(--font-sans); }
+.nav-item.on .nav-lbl, .nav-item.on .nav-icon { color: var(--green); }
+.swipe-area { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0 18px 8px; }
+.hint { display: flex; justify-content: space-between; font-size: 11px; width: 100%; padding: 0 4px; font-family: var(--font-sans); }
+.apt-card {
+  width: 100%; border-radius: 20px; background: var(--bg2);
+  border: 0.5px solid var(--border2); overflow: hidden;
+  transition: transform 0.3s ease, opacity 0.3s ease; cursor: grab;
+}
+.apt-photo {
+  height: 230px; position: relative; overflow: hidden;
+  display: flex; align-items: flex-end;
+}
+.apt-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.photo-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.72) 100%);
+}
+.apt-photo-text { position: relative; z-index: 2; padding: 14px 14px 0; }
+.badge-avail {
+  position: absolute; top: 12px; left: 12px; z-index: 3;
+  background: rgba(15,15,18,0.75); color: var(--text); border-radius: 20px;
+  padding: 5px 12px; font-size: 12px; font-weight: 500; font-family: var(--font-sans);
+  border: 0.5px solid rgba(255,255,255,0.12);
+}
+.badge-match {
+  position: absolute; top: 12px; right: 12px; z-index: 3;
+  background: var(--green); color: #fff; border-radius: 20px;
+  padding: 5px 12px; font-size: 12px; font-weight: 500; font-family: var(--font-sans);
+}
+.apt-body { padding: 14px; }
+.apt-price { font-size: 22px; font-weight: 500; color: var(--text); font-family: var(--font-sans); }
+.apt-addr { font-size: 13px; color: var(--text2); margin-top: 3px; font-family: var(--font-sans); }
+.apt-tags { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+.apt-tag { background: var(--bg3); border-radius: 8px; padding: 4px 10px; font-size: 12px; color: var(--text2); font-family: var(--font-sans); }
+.btns { display: flex; gap: 20px; align-items: center; justify-content: center; padding: 6px 0 4px; }
+.btn-swipe {
+  width: 54px; height: 54px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; border: 0.5px solid var(--border2);
+  background: var(--bg2); cursor: pointer; transition: transform 0.15s;
+  font-family: var(--font-sans); color: var(--text2);
+}
+.btn-swipe:hover { transform: scale(1.1); }
+.btn-pass { border-color: rgba(201,68,68,0.5); color: var(--red); }
+.btn-save { border-color: rgba(29,158,117,0.5); color: var(--green); width: 66px; height: 66px; font-size: 24px; background: var(--green-dim); }
+.btn-info { border-color: rgba(55,138,221,0.4); color: #5b9fd6; }
+.swipe-ov { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 50px; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 10; font-family: var(--font-sans); }
+.saved-hdr { padding: 14px 22px 6px; font-family: var(--font-sans); }
+.saved-list { padding: 0 22px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
+.saved-card {
+  display: flex; gap: 0; border-radius: 14px; overflow: hidden;
+  border: 0.5px solid var(--border2); background: var(--bg2);
+}
+.saved-thumb { width: 88px; min-height: 88px; position: relative; flex-shrink: 0; }
+.saved-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.saved-body { padding: 11px 10px; flex: 1; }
+.saved-price { font-size: 15px; font-weight: 500; color: var(--text); font-family: var(--font-sans); }
+.saved-addr { font-size: 12px; color: var(--text2); margin-top: 2px; font-family: var(--font-sans); }
+.saved-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.saved-tag { font-size: 11px; color: var(--text3); background: var(--bg3); padding: 2px 8px; border-radius: 8px; font-family: var(--font-sans); }
+.match-pill { background: var(--green-dim); color: var(--green-light); border-radius: 10px; padding: 3px 8px; font-size: 11px; font-weight: 500; margin: 10px 10px 0 0; align-self: flex-start; font-family: var(--font-sans); }
+.prof-wrap { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; flex: 1; overflow-y: auto; font-family: var(--font-sans); }
+.ava-row { display: flex; align-items: center; gap: 14px; }
+.ava { width: 58px; height: 58px; border-radius: 50%; background: var(--green-dim); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 500; color: var(--green-light); border: 1px solid rgba(29,158,117,0.3); }
+.pname { font-size: 18px; font-weight: 500; color: var(--text); }
+.psub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+.pcard { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 14px; padding: 13px 15px; }
+.pchead { font-size: 11px; font-weight: 500; color: var(--text3); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+.prow { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 0.5px solid var(--border); }
+.prow:last-child { border: none; }
+.pkey { font-size: 13px; color: var(--text2); }
+.pval { font-size: 13px; color: var(--text); font-weight: 500; }
+.ml-card { background: var(--green-dim); border: 0.5px solid rgba(29,158,117,0.3); border-radius: 14px; padding: 14px 15px; }
+.ml-title { font-size: 13px; font-weight: 500; color: var(--green-light); }
+.ml-sub { font-size: 12px; color: #3d8a6a; margin-top: 3px; }
+.bar-wrap { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; align-items: center; gap: 10px; }
+.bar-lbl { font-size: 12px; color: var(--green-light); width: 90px; font-family: var(--font-sans); }
+.bar-bg { flex: 1; height: 5px; background: rgba(29,158,117,0.15); border-radius: 4px; }
+.bar-fill { height: 5px; background: var(--green); border-radius: 4px; }
+.top-bar { display: flex; justify-content: space-between; align-items: center; padding: 4px 20px 8px; }
+.top-logo { display: flex; align-items: center; gap: 6px; }
+.top-count { font-size: 12px; color: var(--text3); font-family: var(--font-sans); }
+</style>
+
+<div class="phone" id="app">
+
+  <!-- S1: Sign up -->
+  <div class="screen active" id="s-welcome">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px;">● ● ●</span></div>
+    <div class="logo-bar" style="margin-top:20px;"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+    <div style="text-align:center;padding:6px 32px 0;color:var(--text3);font-size:14px;font-family:var(--font-sans);">Find your next home — swipe to discover apartments matched just for you.</div>
+    <div class="content" style="margin-top:20px;">
+      <div class="sec-title">Create your account</div>
+      <div class="steps"><div class="step cur"></div><div class="step"></div><div class="step"></div></div>
+      <div><div class="label">Full name</div><input class="inp" placeholder="Alex Johnson" /></div>
+      <div><div class="label">Email</div><input class="inp" placeholder="alex@email.com" /></div>
+      <div><div class="label">Phone</div><input class="inp" placeholder="(312) 555-0190" /></div>
+      <div><div class="label">Password</div><input class="inp" type="password" placeholder="••••••••" /></div>
+      <button class="cta" onclick="goTo('s-crit1')">Continue →</button>
+      <div class="small-link">Already have an account? <span>Sign in</span></div>
+    </div>
+  </div>
+
+  <!-- S2: Location & specs -->
+  <div class="screen" id="s-crit1">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px;">● ● ●</span></div>
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+    <div class="content">
+      <div><div class="sec-title">Where are you looking?</div><div class="sec-sub">Set your search criteria</div></div>
+      <div class="steps"><div class="step done"></div><div class="step cur"></div><div class="step"></div></div>
+      <div><div class="label">City / Neighborhood</div><input class="inp" placeholder="Chicago, IL" /></div>
+      <div><div class="label">Max monthly rent</div><input class="inp" placeholder="$2,500" /></div>
+      <div class="row2">
+        <div><div class="label">Bedrooms</div><select class="inp" style="appearance:none;"><option>Studio</option><option>1 bed</option><option selected>2 bed</option><option>3+ bed</option></select></div>
+        <div><div class="label">Bathrooms</div><select class="inp" style="appearance:none;"><option>1 bath</option><option selected>2 bath</option><option>3 bath</option></select></div>
+      </div>
+      <div><div class="label">Min square footage</div><input class="inp" placeholder="800 sq ft" /></div>
+      <button class="cta" onclick="goTo('s-crit2')">Continue →</button>
+      <div class="small-link" onclick="goTo('s-welcome')">← Back</div>
+    </div>
+  </div>
+
+  <!-- S3: Amenities -->
+  <div class="screen" id="s-crit2">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px;">● ● ●</span></div>
+    <div class="logo-bar"><div class="logo-dot"></div><span class="logo-text">Abode</span></div>
+    <div class="content">
+      <div><div class="sec-title">Must-have amenities</div><div class="sec-sub">Select all that matter to you</div></div>
+      <div class="steps"><div class="step done"></div><div class="step done"></div><div class="step cur"></div></div>
+      <div class="pill-group">
+        <div class="pill on" onclick="this.classList.toggle('on')">In-unit laundry</div>
+        <div class="pill on" onclick="this.classList.toggle('on')">Parking</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Gym</div>
+        <div class="pill on" onclick="this.classList.toggle('on')">Pet friendly</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Rooftop</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Doorman</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Dishwasher</div>
+        <div class="pill on" onclick="this.classList.toggle('on')">A/C</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Balcony</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Storage</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Pool</div>
+        <div class="pill" onclick="this.classList.toggle('on')">EV charging</div>
+      </div>
+      <div><div class="label">Move-in date</div><input class="inp" placeholder="May 1, 2026" /></div>
+      <div>
+        <div class="label">Lease length</div>
+        <div class="pill-group">
+          <div class="pill on" onclick="this.classList.toggle('on')">12 months</div>
+          <div class="pill" onclick="this.classList.toggle('on')">6 months</div>
+          <div class="pill" onclick="this.classList.toggle('on')">Month-to-month</div>
+        </div>
+      </div>
+      <button class="cta" onclick="goTo('s-swipe')">Start swiping →</button>
+      <div class="small-link" onclick="goTo('s-crit1')">← Back</div>
+    </div>
+  </div>
+
+  <!-- S4: Swipe -->
+  <div class="screen" id="s-swipe">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px;">● ● ●</span></div>
+    <div class="top-bar">
+      <div class="top-logo"><div class="logo-dot"></div><span class="logo-text" style="font-size:18px;">Abode</span></div>
+      <div class="top-count">12 matches near you</div>
+    </div>
+    <div class="swipe-area">
+      <div class="hint"><span style="color:var(--red);">✕ pass</span><span style="color:var(--green);">save ♡</span></div>
+      <div class="apt-card" id="apt-card" style="position:relative;">
+        <div class="swipe-ov" id="swipe-ov"></div>
+        <div class="apt-photo">
+          <img id="apt-img" src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&q=80" alt="apartment" />
+          <div class="photo-overlay"></div>
+          <div class="badge-avail" id="apt-badge">New listing</div>
+          <div class="badge-match" id="apt-match">94% match</div>
+        </div>
+        <div class="apt-body">
+          <div class="apt-price" id="apt-price">$2,100 / mo</div>
+          <div class="apt-addr" id="apt-addr">2 bd · 2 ba · 950 sq ft · Lincoln Park, Chicago</div>
+          <div class="apt-tags" id="apt-tags">
+            <div class="apt-tag">In-unit laundry</div>
+            <div class="apt-tag">Parking</div>
+            <div class="apt-tag">Pet friendly</div>
+            <div class="apt-tag">A/C</div>
+          </div>
+        </div>
+      </div>
+      <div class="btns">
+        <div class="btn-swipe btn-pass" onclick="swipe('pass')">✕</div>
+        <div class="btn-swipe btn-info" onclick="swipe('info')">i</div>
+        <div class="btn-swipe btn-save" onclick="swipe('save')">♡</div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-item on"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+      <div class="nav-item" onclick="goTo('s-saved')"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+      <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+    </div>
+  </div>
+
+  <!-- S5: Saved -->
+  <div class="screen" id="s-saved">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px;">● ● ●</span></div>
+    <div class="saved-hdr"><div class="sec-title">Saved apartments</div><div class="sec-sub">3 places you liked</div></div>
+    <div class="saved-list">
+      <div class="saved-card">
+        <div class="saved-thumb"><img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=200&q=70" alt="apt" /></div>
+        <div class="saved-body">
+          <div class="saved-price">$2,100/mo</div>
+          <div class="saved-addr">Lincoln Park · 2bd 2ba · 950 sq ft</div>
+          <div class="saved-tags"><div class="saved-tag">Parking</div><div class="saved-tag">Pet ok</div><div class="saved-tag">Laundry</div></div>
+        </div>
+        <div class="match-pill">94%</div>
+      </div>
+      <div class="saved-card">
+        <div class="saved-thumb"><img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=200&q=70" alt="apt" /></div>
+        <div class="saved-body">
+          <div class="saved-price">$1,850/mo</div>
+          <div class="saved-addr">Wicker Park · 1bd 1ba · 720 sq ft</div>
+          <div class="saved-tags"><div class="saved-tag">A/C</div><div class="saved-tag">Dishwasher</div></div>
+        </div>
+        <div class="match-pill">88%</div>
+      </div>
+      <div class="saved-card">
+        <div class="saved-thumb"><img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=200&q=70" alt="apt" /></div>
+        <div class="saved-body">
+          <div class="saved-price">$2,400/mo</div>
+          <div class="saved-addr">River North · 2bd 1ba · 1050 sq ft</div>
+          <div class="saved-tags"><div class="saved-tag">Balcony</div><div class="saved-tag">Gym</div></div>
+        </div>
+        <div class="match-pill">82%</div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-item" onclick="goTo('s-swipe')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+      <div class="nav-item on"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+      <div class="nav-item" onclick="goTo('s-profile')"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+    </div>
+  </div>
+
+  <!-- S6: Profile -->
+  <div class="screen" id="s-profile">
+    <div class="status"><span>9:41</span><span style="letter-spacing:2px;">● ● ●</span></div>
+    <div class="prof-wrap">
+      <div class="ava-row">
+        <div class="ava">AJ</div>
+        <div><div class="pname">Alex Johnson</div><div class="psub">Member since April 2026</div></div>
+      </div>
+      <div class="pcard">
+        <div class="pchead">Account details</div>
+        <div class="prow"><span class="pkey">Email</span><span class="pval">alex@email.com</span></div>
+        <div class="prow"><span class="pkey">Phone</span><span class="pval">(312) 555-0190</span></div>
+      </div>
+      <div class="pcard">
+        <div class="pchead">Search criteria</div>
+        <div class="prow"><span class="pkey">Location</span><span class="pval">Chicago, IL</span></div>
+        <div class="prow"><span class="pkey">Budget</span><span class="pval">Up to $2,500/mo</span></div>
+        <div class="prow"><span class="pkey">Beds / Baths</span><span class="pval">2bd · 2ba</span></div>
+        <div class="prow"><span class="pkey">Min sq ft</span><span class="pval">800 sq ft</span></div>
+        <div class="prow"><span class="pkey">Amenities</span><span class="pval">Laundry, Parking, A/C</span></div>
+      </div>
+      <div class="ml-card">
+        <div class="ml-title">Abode is learning your taste</div>
+        <div class="ml-sub">Based on 8 swipes so far</div>
+        <div class="bar-wrap">
+          <div class="bar-row"><div class="bar-lbl">Outdoor space</div><div class="bar-bg"><div class="bar-fill" style="width:80%"></div></div></div>
+          <div class="bar-row"><div class="bar-lbl">Modern kitchen</div><div class="bar-bg"><div class="bar-fill" style="width:65%"></div></div></div>
+          <div class="bar-row"><div class="bar-lbl">Natural light</div><div class="bar-bg"><div class="bar-fill" style="width:90%"></div></div></div>
+          <div class="bar-row"><div class="bar-lbl">Quiet street</div><div class="bar-bg"><div class="bar-fill" style="width:55%"></div></div></div>
+        </div>
+      </div>
+      <button class="cta-ghost" onclick="goTo('s-crit1')">Edit criteria</button>
+    </div>
+    <div class="nav">
+      <div class="nav-item" onclick="goTo('s-swipe')"><div class="nav-icon">⊞</div><div class="nav-lbl">Discover</div></div>
+      <div class="nav-item" onclick="goTo('s-saved')"><div class="nav-icon">♡</div><div class="nav-lbl">Saved</div></div>
+      <div class="nav-item on"><div class="nav-icon">◉</div><div class="nav-lbl">Profile</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px 16px 4px;">
+  <button onclick="goTo('s-welcome')" style="padding:6px 14px;font-size:12px;border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font-sans);">1. Sign up</button>
+  <button onclick="goTo('s-crit1')" style="padding:6px 14px;font-size:12px;border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font-sans);">2. Location</button>
+  <button onclick="goTo('s-crit2')" style="padding:6px 14px;font-size:12px;border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font-sans);">3. Amenities</button>
+  <button onclick="goTo('s-swipe')" style="padding:6px 14px;font-size:12px;border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font-sans);">4. Swipe</button>
+  <button onclick="goTo('s-saved')" style="padding:6px 14px;font-size:12px;border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font-sans);">5. Saved</button>
+  <button onclick="goTo('s-profile')" style="padding:6px 14px;font-size:12px;border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;background:transparent;cursor:pointer;color:var(--text2);font-family:var(--font-sans);">6. Profile</button>
+</div>
+
+<script>
+const apts = [
+  { price:'$2,100/mo', addr:'2 bd · 2 ba · 950 sq ft · Lincoln Park', badge:'New listing', match:'94% match', img:'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&q=80', tags:['In-unit laundry','Parking','Pet friendly','A/C'] },
+  { price:'$1,850/mo', addr:'1 bd · 1 ba · 720 sq ft · Wicker Park', badge:'Price drop', match:'88% match', img:'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&q=80', tags:['A/C','Dishwasher','Hardwood floors'] },
+  { price:'$2,400/mo', addr:'2 bd · 1 ba · 1050 sq ft · River North', badge:'Available now', match:'82% match', img:'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&q=80', tags:['Balcony','Gym','Doorman'] },
+  { price:'$1,700/mo', addr:'Studio · 1 ba · 550 sq ft · Logan Square', badge:'Just listed', match:'76% match', img:'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80', tags:['Pet friendly','Rooftop','Storage'] },
+  { price:'$2,250/mo', addr:'2 bd · 2 ba · 880 sq ft · West Loop', badge:'New listing', match:'91% match', img:'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&q=80', tags:['Rooftop','Gym','Doorman','EV charging'] },
+];
+let idx = 0;
+function goTo(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function swipe(dir) {
+  const card = document.getElementById('apt-card');
+  const ov = document.getElementById('swipe-ov');
+  ov.textContent = dir==='save' ? '♡' : dir==='pass' ? '✕' : 'i';
+  ov.style.color = dir==='save' ? '#1D9E75' : dir==='pass' ? '#c94444' : '#5b9fd6';
+  ov.style.opacity = 1;
+  card.style.transform = dir==='save' ? 'translateX(70px) rotate(7deg)' : dir==='pass' ? 'translateX(-70px) rotate(-7deg)' : 'translateY(-8px)';
+  card.style.opacity = dir==='info' ? 1 : 0.25;
+  setTimeout(()=>{
+    ov.style.opacity=0; card.style.transform='none'; card.style.opacity=1;
+    idx=(idx+1)%apts.length;
+    const a=apts[idx];
+    document.getElementById('apt-price').textContent=a.price;
+    document.getElementById('apt-addr').textContent=a.addr;
+    document.getElementById('apt-badge').textContent=a.badge;
+    document.getElementById('apt-match').textContent=a.match;
+    document.getElementById('apt-img').src=a.img;
+    document.getElementById('apt-tags').innerHTML=a.tags.map(t=>`<div class="apt-tag">${t}</div>`).join('');
+  },320);
+}
+</script>
