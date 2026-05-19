@@ -205,7 +205,7 @@ async def scrape_zillow(filters: dict) -> list[dict]:
                 headers={**zillow_headers, "content-length": str(len(zillow_body))},
             )
 
-        with urllib.request.urlopen(req, context=ssl_ctx) as resp:
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=90) as resp:
             raw = resp.read().decode("utf-8")
             data = json.loads(raw)
     except Exception as e:
