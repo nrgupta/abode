@@ -183,6 +183,8 @@ async def main():
         try:
             new_listings = await run_for_user(user_id, prefs)
             if prefs.get("emailNotify"):
+                has_creds = bool(prefs.get("gmailAddress") and prefs.get("gmailAppPassword"))
+                print(f"  User {user_id}: email notify on, credentials {'found' if has_creds else 'MISSING'}, {len(new_listings)} new listing(s) to send")
                 send_email(
                     new_listings, [], user_id,
                     gmail_address=prefs.get("gmailAddress"),
