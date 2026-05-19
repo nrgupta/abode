@@ -1246,6 +1246,24 @@ function toggleNeighborhood(key, containerId) {
 }
 
 // ══════════════════════════════════════
+//  Zillow neighborhood bounds (client-side)
+// ══════════════════════════════════════
+const NEIGHBORHOOD_BOUNDS = {
+  all:           { west: -87.94011, east: -87.52414, south: 41.64454, north: 42.02304 },
+  lincoln_park:  { west: -87.6637,  east: -87.6330,  south: 41.9107,  north: 41.9391 },
+  wicker_park:   { west: -87.6820,  east: -87.6530,  south: 41.8940,  north: 41.9120 },
+  river_north:   { west: -87.6450,  east: -87.6230,  south: 41.8880,  north: 41.9030 },
+  west_loop:     { west: -87.6620,  east: -87.6370,  south: 41.8780,  north: 41.8930 },
+  logan_square:  { west: -87.7100,  east: -87.6720,  south: 41.9180,  north: 41.9380 },
+  lakeview:      { west: -87.6700,  east: -87.6330,  south: 41.9280,  north: 41.9580 },
+  streeterville: { west: -87.6270,  east: -87.6100,  south: 41.8880,  north: 41.9030 },
+  south_loop:    { west: -87.6380,  east: -87.6150,  south: 41.8620,  north: 41.8800 },
+  bucktown:      { west: -87.6850,  east: -87.6580,  south: 41.9120,  north: 41.9280 },
+  old_town:      { west: -87.6430,  east: -87.6260,  south: 41.9030,  north: 41.9180 },
+  andersonville: { west: -87.6680,  east: -87.6480,  south: 41.9750,  north: 41.9950 },
+};
+
+// ══════════════════════════════════════
 //  Search
 // ══════════════════════════════════════
 async function startSearch() {
@@ -1272,22 +1290,87 @@ async function startSearch() {
   showSwipeLoading();
 
   try {
-    const res = await fetch('/api/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sources: ['zillow'], bedrooms, minBaths, maxRent,
-        minSqft,
-        laundry: extraFilters.laundry || false,
-        parking: extraFilters.parking || false,
-        neighborhoods: [...selectedNeighborhoods],
-      }),
+    // Build map bounds by merging selected neighborhoods
+    const selectedBounds = [...selectedNeighborhoods]
+      .filter(n => NEIGHBORHOOD_BOUNDS[n])
+      .map(n => NEIGHBORHOOD_BOUNDS[n]);
+    const bounds = selectedBounds.length ? selectedBounds : [NEIGHBORHOOD_BOUNDS.lincoln_park];
+    const mapBounds = {
+      west:  Math.min(...bounds.map(b => b.west)),
+      east:  Math.max(...bounds.map(b => b.east)),
+      south: Math.min(...bounds.map(b => b.south)),
+      north: Math.max(...bounds.map(b => b.north)),
+    };
+
+    // Build Zillow filter state
+    const filterState = {
+      isForRent:            { value: true  },
+      isForSaleByAgent:     { value: false },
+      isForSaleByOwner:     { value: false },
+      isNewConstruction:    { value: false },
+      isActiveStatus:       { value: false },
+      isComingSoon:         { value: false },
+      isComingSoonStatus:   { value: false },
+      isZillowPreview:      { value: false },
+      isAuction:            { value: false },
+      isForSaleForeclosure: { value: false },
+      monthlyPayment: { min: 0, max: maxRent },
+      beds:  { min: bedrooms, max: bedrooms },
+      baths: { min: minBaths },
+    };
+    if (extraFilters.laundry)  filterState.onlyRentalInUnitLaundry      = { value: true };
+    if (extraFilters.parking)  filterState.onlyRentalParkingAvailable   = { value: true };
+    if (minSqft)               filterState.sqft = { min: minSqft };
+
+    const payload = {
+      searchQueryState: {
+        pagination: {},
+        isMapVisible: false,
+        mapBounds,
+        mapZoom: 13,
+        regionSelection: [{ regionId: 17426, regionType: 6 }],
+        filterState,
+        isListVisible: true,
+        usersSearchTerm: 'Chicago IL',
+      },
+      wants: { cat1: ['listResults'] },
+      requestId: 4,
+      isDebugRequest: false,
+    };
+
+    // Hit Zillow directly from the browser — uses real browser cookies, bypasses bot detection
+    const res = await fetch('https://www.zillow.com/async-create-search-page-state', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'accept': '*/*' },
+      body: JSON.stringify(payload),
     });
-    if (res.status === 401) { goTo('s-login'); return; }
-    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    if (!res.ok) throw new Error(`Zillow error ${res.status}`);
     const data = await res.json();
 
-    const all = Object.values(data.results || {}).flat();
+    const rawResults = data?.cat1?.searchResults?.listResults || [];
+    const all = rawResults.map(r => {
+      const priceNum = String(r.price || r.unformattedPrice || '').replace(/\D/g, '');
+      if (!priceNum) return null;
+      const cpc    = r.carouselPhotosComposable || {};
+      const base   = cpc.baseUrl || '';
+      const pdata  = cpc.photoData || [];
+      const photos = base && pdata.length
+        ? pdata.filter(p => p.photoKey).map(p => base.replace('{photoKey}', p.photoKey))
+        : (r.imgSrc ? [r.imgSrc] : []);
+      const listing = {
+        title: r.address || '', price: `$${priceNum}/mo`,
+        location: r.address || '',
+        url: `https://www.zillow.com${r.detailUrl || ''}`,
+        beds: r.minBeds || '', baths: r.minBaths || '', sqft: r.minArea || '',
+        image: photos[0] || '', photos, source: 'Zillow',
+        scrapedAt: new Date().toISOString(),
+      };
+      if (r.latLong?.latitude && r.latLong?.longitude) {
+        listing.lat = r.latLong.latitude;
+        listing.lng = r.latLong.longitude;
+      }
+      return listing;
+    }).filter(Boolean);
     // Ensure saved listings are current before filtering
     try {
       const sr = await fetch('/api/saved');
@@ -1321,8 +1404,8 @@ function showSwipeLoading() {
   document.getElementById('swipe-area').innerHTML = `
     <div class="empty-state">
       <div class="spinner"></div>
-      <div style="color:var(--text2);margin-top:6px;">Scraping listings…</div>
-      <div style="color:var(--text3);font-size:12px;">This can take 15–30 seconds</div>
+      <div style="color:var(--text2);margin-top:6px;">Searching Zillow…</div>
+      <div style="color:var(--text3);font-size:12px;">Fetching listings…</div>
     </div>`;
   document.getElementById('swipe-count').textContent = '';
 }
