@@ -592,6 +592,27 @@ def get_agent_listings():
     return jsonify({"listings": listings})
 
 
+@app.route("/api/agent/listings", methods=["DELETE"])
+def delete_agent_listing():
+    uid, err = require_auth()
+    if err:
+        return err
+    data = request.get_json(force=True) or {}
+    key  = (data.get("key") or "").lower().strip()
+    if not key:
+        return jsonify({"error": "key required"}), 400
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM agent_listings WHERE user_id = %s AND key = %s",
+                (uid, key),
+            )
+        conn.commit()
+    # Also add to passed so the daily job won't re-add it
+    pass_one(uid, key)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/neighborhoods", methods=["GET"])
 def get_neighborhoods():
     labels = {

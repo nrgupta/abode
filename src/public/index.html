@@ -1764,6 +1764,7 @@ function renderAgentDailyList() {
         <div class="saved-actions">
           ${l.url ? `<button class="saved-btn view" onclick="window.open('${esc(l.url)}','_blank','noopener')">View →</button>` : ''}
           <button class="saved-btn" style="color:var(--green);border-color:rgba(108,192,149,0.3);" onclick="saveFromAgent('${key}')">Save</button>
+          <button class="saved-btn remove" onclick="passFromAgent('${key}')">Pass</button>
         </div>
       </div>`;
   }).join('');
@@ -1773,6 +1774,30 @@ async function saveFromAgent(key) {
   const listing = agentDailyListings.find(l => listingKey(l).replace(/'/g, "\\'") === key || listingKey(l) === key);
   if (!listing) return;
   await saveListing(listing);
+  // Remove from agent tab in DB and local list
+  agentDailyListings = agentDailyListings.filter(l => listingKey(l).replace(/'/g, "\\'") !== key && listingKey(l) !== key);
+  renderAgentDailyList();
+  try {
+    await fetch('/api/agent/listings', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+  } catch (_) {}
+}
+
+async function passFromAgent(key) {
+  // Remove from local list and re-render immediately
+  agentDailyListings = agentDailyListings.filter(l => listingKey(l).replace(/'/g, "\\'") !== key && listingKey(l) !== key);
+  renderAgentDailyList();
+  // Remove from agent tab in DB + add to passed list so daily job won't re-add
+  try {
+    await fetch('/api/agent/listings', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+  } catch (_) {}
 }
 
 // ══════════════════════════════════════
