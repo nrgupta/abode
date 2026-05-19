@@ -83,7 +83,10 @@ def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=
         "isForSaleByAgent":     {"value": False},
         "isForSaleByOwner":     {"value": False},
         "isNewConstruction":    {"value": False},
+        "isActiveStatus":       {"value": False},
         "isComingSoon":         {"value": False},
+        "isComingSoonStatus":   {"value": False},
+        "isZillowPreview":      {"value": False},
         "isAuction":            {"value": False},
         "isForSaleForeclosure": {"value": False},
         "monthlyPayment": {k: v for k, v in {"min": min_rent, "max": max_rent}.items() if v is not None},
@@ -103,17 +106,18 @@ def build_payload(max_rent, min_rent=0, min_beds=None, max_beds=None, min_baths=
     return {
         "searchQueryState": {
             "pagination": {},
-            "isMapVisible": True,
+            "isMapVisible": False,
             "mapBounds": map_bounds,
             "mapZoom": MAP_ZOOM,
             "regionSelection": REGION_SELECTION,
             "filterState": filter_state,
             "isListVisible": True,
+            "usersSearchTerm": "Chicago IL",
         },
         "wants": {
-            "cat1": ["mapResults", "listResults"],
+            "cat1": ["listResults"],
         },
-        "requestId": 2,
+        "requestId": 4,
         "isDebugRequest": False,
     }
 
@@ -164,11 +168,15 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         data=body,
         method="PUT",
         headers={
-            "accept":          "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "content-type":    "application/json",
-            "content-length":  str(len(body)),
-            "user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+            "accept":               "*/*",
+            "accept-language":      "en-US,en;q=0.9",
+            "content-type":         "application/json",
+            "content-length":       str(len(body)),
+            "referer":              "https://www.zillow.com/chicago-il/rentals/",
+            "sec-ch-ua":            '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
+            "sec-ch-ua-mobile":     "?0",
+            "sec-ch-ua-platform":   '"macOS"',
+            "user-agent":           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
         },
     )
 
@@ -185,25 +193,12 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         return []
 
     search_results = (data.get("cat1") or {}).get("searchResults", {})
-    results = search_results.get("mapResults", [])
+    results = search_results.get("listResults", [])
 
     if not results:
         # Log the raw response (truncated) to help diagnose bot detection / API changes
         snippet = raw[:500] if len(raw) > 500 else raw
-        print(f"Zillow returned 0 mapResults. Response snippet: {snippet}")
-
-    # Build zpid → carousel photos map from listResults
-    photo_map: dict[str, list[str]] = {}
-    for lr in search_results.get("listResults", []):
-        zpid = str(lr.get("zpid", ""))
-        cpc = lr.get("carouselPhotosComposable") or {}
-        base_url = cpc.get("baseUrl", "")
-        photo_data = cpc.get("photoData") or []
-        if base_url and photo_data:
-            photo_map[zpid] = [
-                base_url.replace("{photoKey}", p["photoKey"])
-                for p in photo_data if p.get("photoKey")
-            ]
+        print(f"Zillow returned 0 listResults. Response snippet: {snippet}")
 
     listings = []
 
@@ -213,8 +208,16 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         if not numeric_price:
             continue
 
-        zpid = str(r.get("zpid", ""))
-        photos = photo_map.get(zpid) or []
+        # Extract carousel photos from listResults directly
+        cpc = r.get("carouselPhotosComposable") or {}
+        base_url = cpc.get("baseUrl", "")
+        photo_data = cpc.get("photoData") or []
+        photos = []
+        if base_url and photo_data:
+            photos = [
+                base_url.replace("{photoKey}", p["photoKey"])
+                for p in photo_data if p.get("photoKey")
+            ]
         if not photos and r.get("imgSrc"):
             photos = [r["imgSrc"]]
 
