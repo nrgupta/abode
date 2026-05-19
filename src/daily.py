@@ -1,11 +1,8 @@
 import asyncio
 import json
 import os
-import smtplib
 import sys
 import urllib.request
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from dotenv import load_dotenv
 
@@ -20,6 +17,9 @@ from server import (
 # If set, delegate Zillow scraping to the web service (avoids cron IP blocks)
 WEB_SERVICE_URL = os.environ.get("WEB_SERVICE_URL", "").rstrip("/")
 INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
+
+RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM     = os.environ.get("RESEND_FROM_EMAIL", "Abode <notifications@yourdomain.com>")
 
 
 def format_section(title: str, listings: list) -> str:
@@ -51,48 +51,44 @@ def get_user_email(user_id: int) -> str | None:
         return None
 
 
-def send_email(new_listings: list, _unused: list, user_id: int | None = None, gmail_address: str | None = None, gmail_app_password: str | None = None):
-    """Send email digest of new listings to the user."""
-    # Prefer per-user credentials from prefs; fall back to env vars
-    sender_email    = gmail_address    or os.getenv("GMAIL_ADDRESS")
-    sender_password = gmail_app_password or os.getenv("GMAIL_APP_PASSWORD")
-
-    if not sender_email or not sender_password:
-        print("Warning: Email credentials not configured (set Gmail address/app password in Profile)")
+def send_email(new_listings: list, _unused: list, user_id: int | None = None, **kwargs):
+    """Send email digest of new listings via Resend API (HTTPS, no SMTP)."""
+    if not RESEND_API_KEY:
+        print("  Warning: RESEND_API_KEY not set, skipping email")
         return
 
-    recipient_email = get_user_email(user_id) if user_id else "neilg2001@gmail.com"
+    recipient_email = get_user_email(user_id) if user_id else None
     if not recipient_email:
         print(f"  User {user_id}: could not find email address, skipping notification")
         return
 
     total = len(new_listings)
-
     if total == 0:
-        body    = "No new listings found today."
+        text    = "No new listings found today."
         subject = "Abode - No new listings today"
     else:
-        body    = "New apartment listings found:\n\n"
-        body   += format_section("New Listings", new_listings)
+        text    = "New apartment listings found:\n\n" + format_section("New Listings", new_listings)
         subject = f"Abode - {total} new listing{'s' if total != 1 else ''} found"
 
+    payload = json.dumps({
+        "from":    RESEND_FROM,
+        "to":      [recipient_email],
+        "subject": subject,
+        "text":    text,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type":  "application/json",
+        },
+    )
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = sender_email
-        msg["To"]      = recipient_email
-        msg.attach(MIMEText(body, "plain"))
-
-        print(f"  Connecting to smtp.gmail.com:587...")
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            print(f"  Logging in as {sender_email}...")
-            server.login(sender_email, sender_password)
-            print(f"  Sending email...")
-            server.sendmail(sender_email, recipient_email, msg.as_string())
-
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
         print(f"  Email sent to {recipient_email}")
     except Exception as e:
         print(f"  Failed to send email: {e}")
@@ -189,13 +185,8 @@ async def main():
         try:
             new_listings = await run_for_user(user_id, prefs)
             if prefs.get("emailNotify"):
-                has_creds = bool(prefs.get("gmailAddress") and prefs.get("gmailAppPassword"))
-                print(f"  User {user_id}: email notify on, credentials {'found' if has_creds else 'MISSING'}, {len(new_listings)} new listing(s) to send")
-                send_email(
-                    new_listings, [], user_id,
-                    gmail_address=prefs.get("gmailAddress"),
-                    gmail_app_password=prefs.get("gmailAppPassword"),
-                )
+                print(f"  User {user_id}: email notify on, {len(new_listings)} new listing(s) to send")
+                send_email(new_listings, [], user_id)
             else:
                 print(f"  User {user_id}: email notifications off, skipping email")
         except Exception as e:
