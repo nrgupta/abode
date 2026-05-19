@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
 from dotenv import load_dotenv
@@ -90,6 +91,9 @@ def send_email(new_listings: list, _unused: list, user_id: int | None = None, **
         with urllib.request.urlopen(req, timeout=30) as resp:
             resp.read()
         print(f"  Email sent to {recipient_email}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        print(f"  Failed to send email: HTTP {e.code} — {body}")
     except Exception as e:
         print(f"  Failed to send email: {e}")
 
