@@ -11,8 +11,10 @@ load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.listingsTool import run_agent
-from server import load_all_user_prefs, save_agent_listings, purge_expired_agent_listings
-from sheets.google_sheets import sync_to_sheets
+from server import (
+    load_all_user_prefs, save_agent_listings, purge_expired_agent_listings,
+    load_saved, load_passed_keys, load_agent_listings, listing_key,
+)
 
 
 def format_section(title: str, listings: list) -> str:
@@ -107,24 +109,29 @@ async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     listings, _ = await run_agent(filters, sources=["zillow"])
     print(f"  User {user_id}: scraped {len(listings)} listings")
 
-    # Remove agent listings no longer in the current scrape (rented/expired)
-    active_keys = {(l.get("url") or l.get("title") or "").lower().strip() for l in listings}
+    # Build a set of keys the user has already acted on (saved or passed)
+    saved_keys  = {listing_key(l) for l in load_saved(user_id)}
+    passed_keys = set(load_passed_keys(user_id))
+    seen_keys   = saved_keys | passed_keys
+
+    # Build a set of keys already in the agent tab (so we can identify truly new ones)
+    existing_agent_keys = {listing_key(l) for l in load_agent_listings(user_id)}
+
+    # Purge agent listings no longer in the current scrape (rented/expired)
+    active_keys = {listing_key(l) for l in listings}
     expired = purge_expired_agent_listings(user_id, active_keys)
     if expired:
         print(f"  User {user_id}: removed {expired} expired listing(s)")
 
-    # Always save all current listings to the agent tab (upsert — safe every run)
-    # This must happen before (and independently of) the optional sheets sync.
-    save_agent_listings(user_id, listings, category)
-    print(f"  User {user_id}: {len(listings)} listings saved to agent tab")
+    # Only save listings that aren't in saved or passed tabs
+    eligible = [l for l in listings if listing_key(l) not in seen_keys]
+    if eligible:
+        save_agent_listings(user_id, eligible, category)
+    print(f"  User {user_id}: {len(eligible)}/{len(listings)} eligible listings saved to agent tab")
 
-    # Optionally sync to Google Sheets — non-critical, skip gracefully if misconfigured
-    new_listings = listings
-    try:
-        new_listings = await sync_to_sheets(listings, sheet_key=f"user_{user_id}")
-        print(f"  User {user_id}: {len(new_listings)} new listings synced to sheets")
-    except Exception as e:
-        print(f"  User {user_id}: sheets sync skipped — {e}")
+    # New listings = eligible ones that weren't already in the agent tab
+    new_listings = [l for l in eligible if listing_key(l) not in existing_agent_keys]
+    print(f"  User {user_id}: {len(new_listings)} truly new listing(s) for email")
 
     return new_listings
 
