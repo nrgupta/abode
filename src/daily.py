@@ -83,8 +83,11 @@ def send_email(new_listings: list, _unused: list, user_id: int | None = None, gm
         msg["To"]      = recipient_email
         msg.attach(MIMEText(body, "plain"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        print(f"  Connecting to smtp.gmail.com:465...")
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
+            print(f"  Logging in as {sender_email}...")
             server.login(sender_email, sender_password)
+            print(f"  Sending email...")
             server.sendmail(sender_email, recipient_email, msg.as_string())
 
         print(f"  Email sent to {recipient_email}")
