@@ -1,7 +1,9 @@
 import asyncio
+import json
 import os
 import smtplib
 import sys
+import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -10,11 +12,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agent.listingsTool import run_agent
 from server import (
     load_all_user_prefs, save_agent_listings, purge_expired_agent_listings,
     load_saved, load_passed_keys, load_agent_listings, listing_key,
 )
+
+# If set, delegate Zillow scraping to the web service (avoids cron IP blocks)
+WEB_SERVICE_URL = os.environ.get("WEB_SERVICE_URL", "").rstrip("/")
+INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
 
 
 def format_section(title: str, listings: list) -> str:
@@ -87,6 +92,34 @@ def send_email(new_listings: list, _unused: list, user_id: int | None = None, gm
         print(f"  Failed to send email: {e}")
 
 
+async def _scrape_listings(filters: dict) -> list[dict]:
+    """Fetch listings via the web service (preferred) or directly as fallback."""
+    if WEB_SERVICE_URL and INTERNAL_SECRET:
+        url  = f"{WEB_SERVICE_URL}/api/internal/search"
+        body = json.dumps(filters).encode("utf-8")
+        req  = urllib.request.Request(
+            url, data=body, method="POST",
+            headers={
+                "Content-Type":      "application/json",
+                "X-Internal-Secret": INTERNAL_SECRET,
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            listings = data.get("listings", [])
+            source   = "cache" if data.get("cached") else "web service"
+            print(f"    Fetched {len(listings)} listings from {source}")
+            return listings
+        except Exception as e:
+            print(f"    Web service scrape failed ({e}), falling back to direct scrape")
+
+    # Direct scrape fallback (may hit IP blocks on Railway cron)
+    from agent.listingsTool import run_agent
+    listings, _ = await run_agent(filters, sources=["zillow"])
+    return listings
+
+
 async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     """Run a scrape for a single user based on their saved prefs."""
     filters = {
@@ -106,7 +139,7 @@ async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     beds = filters["bedrooms"]
     category = f"{beds}bd/{filters['minBaths']}ba"
     print(f"  User {user_id}: scraping {category}, maxRent=${filters['maxRent']}")
-    listings, _ = await run_agent(filters, sources=["zillow"])
+    listings = await _scrape_listings(filters)
     print(f"  User {user_id}: scraped {len(listings)} listings")
 
     # Build a set of keys the user has already acted on (saved or passed)

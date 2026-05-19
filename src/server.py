@@ -471,6 +471,58 @@ def search():
     return jsonify(resp)
 
 
+INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
+
+
+@app.route("/api/internal/search", methods=["POST"])
+def internal_search():
+    """Scrape endpoint for the daily cron job — authenticated by shared secret, not session."""
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not INTERNAL_SECRET or secret != INTERNAL_SECRET:
+        return jsonify({"error": "Forbidden"}), 403
+
+    data = request.get_json(force=True) or {}
+    bedrooms      = data.get("bedrooms")
+    min_baths     = data.get("minBaths")
+    max_rent      = data.get("maxRent")
+    min_rent      = data.get("minRent", 0)
+    min_sqft      = data.get("minSqft")
+    laundry       = bool(data.get("laundry", False))
+    parking       = bool(data.get("parking", False))
+    neighborhoods = data.get("neighborhoods", ["lincoln_park"])
+    if isinstance(neighborhoods, str):
+        neighborhoods = [neighborhoods]
+
+    if not max_rent or not bedrooms:
+        return jsonify({"error": "bedrooms and maxRent are required"}), 400
+
+    filters = {
+        "maxRent":       int(max_rent),
+        "minRent":       int(min_rent),
+        "bedrooms":      int(bedrooms),
+        "minBaths":      int(min_baths) if min_baths else None,
+        "minSqft":       int(min_sqft) if min_sqft else None,
+        "laundry":       laundry,
+        "parking":       parking,
+        "neighborhoods": neighborhoods,
+    }
+
+    # Use cache if available — avoids redundant scrapes if cron runs close to a user search
+    cached = cache_get(filters)
+    if cached is not None:
+        return jsonify({"listings": cached, "cached": True})
+
+    try:
+        listings, _ = asyncio.run(run_agent(filters, ["zillow"]))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    if listings:
+        cache_set(filters, listings)
+
+    return jsonify({"listings": listings, "cached": False})
+
+
 @app.route("/api/saved", methods=["GET"])
 def get_saved():
     uid, err = require_auth()
