@@ -185,19 +185,16 @@ async def scrape_zillow(filters: dict) -> list[dict]:
     try:
         if SCRAPERAPI_KEY:
             # Route through ScraperAPI to avoid IP blocks
-            # ScraperAPI's POST endpoint accepts target URL + body as JSON
-            scraper_payload = json.dumps({
-                "apiKey":  SCRAPERAPI_KEY,
-                "url":     ZILLOW_API_URL,
-                "method":  "PUT",
-                "body":    json.dumps(payload),
-                "headers": zillow_headers,
-            }).encode("utf-8")
+            # Pass api_key + target url as query params, send body as PUT directly
+            proxy_url = (
+                "https://api.scraperapi.com/?"
+                + urllib.parse.urlencode({"api_key": SCRAPERAPI_KEY, "url": ZILLOW_API_URL})
+            )
             req = urllib.request.Request(
-                "https://api.scraperapi.com/",
-                data=scraper_payload,
-                method="POST",
-                headers={"Content-Type": "application/json"},
+                proxy_url,
+                data=zillow_body,
+                method="PUT",
+                headers=zillow_headers,
             )
             print("  Scraping via ScraperAPI...")
         else:
