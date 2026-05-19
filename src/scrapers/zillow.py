@@ -168,6 +168,8 @@ async def scrape_zillow(filters: dict) -> list[dict]:
             "accept-language": "en-US,en;q=0.9",
             "content-type":    "application/json",
             "content-length":  str(len(body)),
+            "origin":          "https://www.zillow.com",
+            "referer":         "https://www.zillow.com/chicago-il/rentals/",
             "user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
         },
     )
@@ -178,13 +180,19 @@ async def scrape_zillow(filters: dict) -> list[dict]:
 
     try:
         with urllib.request.urlopen(req, context=ssl_ctx) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+            raw = resp.read().decode("utf-8")
+            data = json.loads(raw)
     except Exception as e:
         print(f"Zillow request error: {e}")
         return []
 
     search_results = (data.get("cat1") or {}).get("searchResults", {})
     results = search_results.get("mapResults", [])
+
+    if not results:
+        # Log the raw response (truncated) to help diagnose bot detection / API changes
+        snippet = raw[:500] if len(raw) > 500 else raw
+        print(f"Zillow returned 0 mapResults. Response snippet: {snippet}")
 
     # Build zpid → carousel photos map from listResults
     photo_map: dict[str, list[str]] = {}

@@ -104,6 +104,7 @@ async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     category = f"{beds}bd/{filters['minBaths']}ba"
     print(f"  User {user_id}: scraping {category}, maxRent=${filters['maxRent']}")
     listings, _ = await run_agent(filters, sources=["zillow"])
+    print(f"  User {user_id}: scraped {len(listings)} listings")
 
     # Remove agent listings no longer in the current scrape (rented/expired)
     active_keys = {(l.get("url") or l.get("title") or "").lower().strip() for l in listings}
@@ -111,9 +112,19 @@ async def run_for_user(user_id: int, prefs: dict) -> list[dict]:
     if expired:
         print(f"  User {user_id}: removed {expired} expired listing(s)")
 
-    new_listings = await sync_to_sheets(listings, sheet_key=f"user_{user_id}")
-    save_agent_listings(user_id, new_listings, category)
-    print(f"  User {user_id}: {len(new_listings)} new listings saved")
+    # Always save all current listings to the agent tab (upsert — safe every run)
+    # This must happen before (and independently of) the optional sheets sync.
+    save_agent_listings(user_id, listings, category)
+    print(f"  User {user_id}: {len(listings)} listings saved to agent tab")
+
+    # Optionally sync to Google Sheets — non-critical, skip gracefully if misconfigured
+    new_listings = listings
+    try:
+        new_listings = await sync_to_sheets(listings, sheet_key=f"user_{user_id}")
+        print(f"  User {user_id}: {len(new_listings)} new listings synced to sheets")
+    except Exception as e:
+        print(f"  User {user_id}: sheets sync skipped — {e}")
+
     return new_listings
 
 
