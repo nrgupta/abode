@@ -1,10 +1,14 @@
 import json
+import os
 import re
 import ssl
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-ZILLOW_API_URL = "https://www.zillow.com/async-create-search-page-state"
+ZILLOW_API_URL  = "https://www.zillow.com/async-create-search-page-state"
+SCRAPERAPI_KEY  = os.environ.get("SCRAPERAPI_KEY", "")
+SCRAPERAPI_URL  = "https://api.scraperapi.com/"
 
 MAP_ZOOM = 13
 
@@ -161,30 +165,49 @@ async def scrape_zillow(filters: dict) -> list[dict]:
         parking=parking,
     )
 
-    body = json.dumps(payload).encode("utf-8")
+    zillow_body = json.dumps(payload).encode("utf-8")
 
-    req = urllib.request.Request(
-        ZILLOW_API_URL,
-        data=body,
-        method="PUT",
-        headers={
-            "accept":               "*/*",
-            "accept-language":      "en-US,en;q=0.9",
-            "content-type":         "application/json",
-            "content-length":       str(len(body)),
-            "referer":              "https://www.zillow.com/chicago-il/rentals/",
-            "sec-ch-ua":            '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
-            "sec-ch-ua-mobile":     "?0",
-            "sec-ch-ua-platform":   '"macOS"',
-            "user-agent":           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
-        },
-    )
+    zillow_headers = {
+        "accept":             "*/*",
+        "accept-language":    "en-US,en;q=0.9",
+        "content-type":       "application/json",
+        "referer":            "https://www.zillow.com/chicago-il/rentals/",
+        "sec-ch-ua":          '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
+        "sec-ch-ua-mobile":   "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "user-agent":         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    }
 
     ssl_ctx = ssl.create_default_context()
     ssl_ctx.check_hostname = False
     ssl_ctx.verify_mode = ssl.CERT_NONE
 
     try:
+        if SCRAPERAPI_KEY:
+            # Route through ScraperAPI to avoid IP blocks
+            # ScraperAPI's POST endpoint accepts target URL + body as JSON
+            scraper_payload = json.dumps({
+                "apiKey":  SCRAPERAPI_KEY,
+                "url":     ZILLOW_API_URL,
+                "method":  "PUT",
+                "body":    json.dumps(payload),
+                "headers": zillow_headers,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.scraperapi.com/",
+                data=scraper_payload,
+                method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            print("  Scraping via ScraperAPI...")
+        else:
+            req = urllib.request.Request(
+                ZILLOW_API_URL,
+                data=zillow_body,
+                method="PUT",
+                headers={**zillow_headers, "content-length": str(len(zillow_body))},
+            )
+
         with urllib.request.urlopen(req, context=ssl_ctx) as resp:
             raw = resp.read().decode("utf-8")
             data = json.loads(raw)
