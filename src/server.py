@@ -552,7 +552,10 @@ def internal_send_email():
         msg["To"]      = to_addr
         msg.attach(MIMEText(body, "plain"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=60) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
             server.login(gmail_address, gmail_password)
             server.sendmail(gmail_address, to_addr, msg.as_string())
 
