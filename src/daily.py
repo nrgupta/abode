@@ -15,7 +15,7 @@ from server import (
     load_saved, load_passed_keys, load_agent_listings, listing_key,
 )
 
-# If set, delegate Zillow scraping and email to the web service (avoids cron network restrictions)
+# Delegate scraping and email to the web service (cron containers have no outbound network access)
 WEB_SERVICE_URL = os.environ.get("WEB_SERVICE_URL", "").rstrip("/")
 INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
 
