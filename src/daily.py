@@ -15,12 +15,9 @@ from server import (
     load_saved, load_passed_keys, load_agent_listings, listing_key,
 )
 
-# If set, delegate Zillow scraping to the web service (avoids cron IP blocks)
+# If set, delegate Zillow scraping and email to the web service (avoids cron network restrictions)
 WEB_SERVICE_URL = os.environ.get("WEB_SERVICE_URL", "").rstrip("/")
 INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
-
-RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM     = os.environ.get("RESEND_FROM_EMAIL", "Abode <notifications@yourdomain.com>")
 
 
 def format_section(title: str, listings: list) -> str:
@@ -53,9 +50,9 @@ def get_user_email(user_id: int) -> str | None:
 
 
 def send_email(new_listings: list, _unused: list, user_id: int | None = None, **kwargs):
-    """Send email digest of new listings via Resend API (HTTPS, no SMTP)."""
-    if not RESEND_API_KEY:
-        print("  Warning: RESEND_API_KEY not set, skipping email")
+    """Delegate email sending to the web service, which has SMTP network access."""
+    if not WEB_SERVICE_URL or not INTERNAL_SECRET:
+        print("  Warning: WEB_SERVICE_URL or INTERNAL_SECRET not set, skipping email")
         return
 
     recipient_email = get_user_email(user_id) if user_id else None
@@ -65,26 +62,25 @@ def send_email(new_listings: list, _unused: list, user_id: int | None = None, **
 
     total = len(new_listings)
     if total == 0:
-        text    = "No new listings found today."
+        body    = "No new listings found today."
         subject = "Abode - No new listings today"
     else:
-        text    = "New apartment listings found:\n\n" + format_section("New Listings", new_listings)
+        body    = "New apartment listings found:\n\n" + format_section("New Listings", new_listings)
         subject = f"Abode - {total} new listing{'s' if total != 1 else ''} found"
 
     payload = json.dumps({
-        "from":    RESEND_FROM,
-        "to":      [recipient_email],
+        "to":      recipient_email,
         "subject": subject,
-        "text":    text,
+        "body":    body,
     }).encode("utf-8")
 
     req = urllib.request.Request(
-        "https://api.resend.com/emails",
+        f"{WEB_SERVICE_URL}/api/internal/send-email",
         data=payload,
         method="POST",
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type":  "application/json",
+            "Content-Type":      "application/json",
+            "X-Internal-Secret": INTERNAL_SECRET,
         },
     )
     try:

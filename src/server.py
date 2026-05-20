@@ -4,8 +4,11 @@ import json
 import math
 import os
 import secrets
+import smtplib
 import urllib.parse
 import urllib.request
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -521,6 +524,41 @@ def internal_search():
         cache_set(filters, listings)
 
     return jsonify({"listings": listings, "cached": False})
+
+
+@app.route("/api/internal/send-email", methods=["POST"])
+def internal_send_email():
+    """Send email on behalf of the cron job — cron containers block SMTP, web service does not."""
+    secret = request.headers.get("X-Internal-Secret", "")
+    if not INTERNAL_SECRET or secret != INTERNAL_SECRET:
+        return jsonify({"error": "Forbidden"}), 403
+
+    data           = request.get_json(force=True) or {}
+    to_addr        = data.get("to")
+    subject        = data.get("subject")
+    body           = data.get("body")
+    gmail_address  = data.get("gmailAddress") or os.getenv("GMAIL_ADDRESS")
+    gmail_password = data.get("gmailAppPassword") or os.getenv("GMAIL_APP_PASSWORD")
+
+    if not all([to_addr, subject, body]):
+        return jsonify({"error": "to, subject, and body are required"}), 400
+    if not gmail_address or not gmail_password:
+        return jsonify({"error": "Gmail credentials not configured"}), 500
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = gmail_address
+        msg["To"]      = to_addr
+        msg.attach(MIMEText(body, "plain"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_address, gmail_password)
+            server.sendmail(gmail_address, to_addr, msg.as_string())
+
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/saved", methods=["GET"])
