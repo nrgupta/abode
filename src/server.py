@@ -4,11 +4,9 @@ import json
 import math
 import os
 import secrets
-import smtplib
+import urllib.error
 import urllib.parse
 import urllib.request
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -528,38 +526,49 @@ def internal_search():
 
 @app.route("/api/internal/send-email", methods=["POST"])
 def internal_send_email():
-    """Send email on behalf of the cron job — cron containers block SMTP, web service does not."""
+    """Send email on behalf of the cron job via Resend API (HTTPS, never blocked)."""
     secret = request.headers.get("X-Internal-Secret", "")
     if not INTERNAL_SECRET or secret != INTERNAL_SECRET:
         return jsonify({"error": "Forbidden"}), 403
 
-    data           = request.get_json(force=True) or {}
-    to_addr        = data.get("to")
-    subject        = data.get("subject")
-    body           = data.get("body")
-    gmail_address  = data.get("gmailAddress") or os.getenv("GMAIL_ADDRESS")
-    gmail_password = data.get("gmailAppPassword") or os.getenv("GMAIL_APP_PASSWORD")
+    data    = request.get_json(force=True) or {}
+    to_addr = data.get("to")
+    subject = data.get("subject")
+    body    = data.get("body")
 
     if not all([to_addr, subject, body]):
         return jsonify({"error": "to, subject, and body are required"}), 400
-    if not gmail_address or not gmail_password:
-        return jsonify({"error": "Gmail credentials not configured"}), 500
 
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    resend_from    = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+
+    if not resend_api_key:
+        return jsonify({"error": "RESEND_API_KEY not configured"}), 500
+
+    payload = json.dumps({
+        "from":    resend_from,
+        "to":      [to_addr],
+        "subject": subject,
+        "text":    body,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type":  "application/json",
+        },
+    )
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = gmail_address
-        msg["To"]      = to_addr
-        msg.attach(MIMEText(body, "plain"))
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=60) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(gmail_address, gmail_password)
-            server.sendmail(gmail_address, to_addr, msg.as_string())
-
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
         return jsonify({"ok": True})
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        print(f"  Resend API error: HTTP {e.code} — {err_body}")
+        return jsonify({"error": f"Resend error {e.code}: {err_body}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
