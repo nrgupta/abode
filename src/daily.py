@@ -62,11 +62,11 @@ def send_email(new_listings: list, _unused: list, user_id: int | None = None, **
 
     total = len(new_listings)
     if total == 0:
-        body    = "No new listings found today."
-        subject = "Abode - No new listings today"
-    else:
-        body    = "New apartment listings found:\n\n" + format_section("New Listings", new_listings)
-        subject = f"Abode - {total} new listing{'s' if total != 1 else ''} found"
+        print(f"  User {user_id}: 0 new listings, skipping email")
+        return
+
+    body    = "New apartment listings found:\n\n" + format_section("New Listings", new_listings)
+    subject = f"Abode - {total} new listing{'s' if total != 1 else ''} found"
 
     payload = json.dumps({
         "to":      recipient_email,
@@ -81,6 +81,7 @@ def send_email(new_listings: list, _unused: list, user_id: int | None = None, **
         headers={
             "Content-Type":      "application/json",
             "X-Internal-Secret": INTERNAL_SECRET,
+            "User-Agent":        "python-requests/2.31.0",
         },
     )
     try:
