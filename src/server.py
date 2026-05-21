@@ -559,6 +559,7 @@ def internal_send_email():
         headers={
             "Authorization": f"Bearer {resend_api_key}",
             "Content-Type":  "application/json",
+            "User-Agent":    "python-requests/2.31.0",
         },
     )
     try:
