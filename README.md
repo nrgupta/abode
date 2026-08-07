@@ -2,6 +2,9 @@
 
 A Chicago apartment finder with a swipe-based mobile UI prototype. Scrapes Zillow, Redfin, and Craigslist for Chicago rentals, syncs listings to Google Sheets, and sends daily email summaries. Runs automatically every day at 3:30 PM CST via launchd.
 
+<img width="332" height="518" alt="abode" src="https://github.com/user-attachments/assets/ca69c66a-4ed3-46bd-92bb-177575623623" />
+
+
 ## Mobile UI Prototype
 
 `abode_dark_prototype_v2.html` — open in any browser to preview a Tinder-style mobile app concept with 6 screens:
